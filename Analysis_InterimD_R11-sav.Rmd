@@ -22,8 +22,8 @@ bibliography: References.bib
 csl: apa.csl
 link-citations: yes
 params:
-  mainFile: "DataDD/ESS10_CZ_ms.sav"
-  intFile: "DataDD/ESS10_CZ_i.sav"
+  mainFile: ""
+  intFile: ""
 
 # European Social Survey - European Research Infrastructure (ESS-ERIC)
 # europeansocialsurvey.org
@@ -199,7 +199,7 @@ For the interim dataset, quality benchmarks have been defined with a low sensiti
 
 ## Evaluation of Results
 
-_Figures, Tables and Detailed Tables in Annex Folder__
+_Figures, Tables and Detailed Tables in Annex Folder_
 
 In the report, results are presented in figures and table to provide a quick overview of the issues. Promatic cases or interviewer are usually highlighted. However, it is not always possible to provide a adaquate overview of all issues for all countries. Therefore, indicators are saved into the Annex folder together with the report for further invatigation. 
 
