@@ -22,8 +22,8 @@ bibliography: References.bib
 csl: apa.csl
 link-citations: yes
 params:
-  mainFile: "DataDD/ESS10_CZ_ms.sav"
-  intFile: "DataDD/ESS10_CZ_i.sav"
+  mainFile: ""
+  intFile: ""
 
 # European Social Survey - European Research Infrastructure (ESS-ERIC)
 # europeansocialsurvey.org
