@@ -1,0 +1,147 @@
+---
+output:
+  pdf_document:
+    includes:
+      in_header: styles.tex
+    number_sections: TRUE
+    latex_engine: xelatex
+    fig_caption: yes
+    fig_width: 4
+    fig_height: 3
+    keep_tex: TRUE
+header-includes:
+  - \usepackage{titling}
+  - \setlength{\droptitle}{5em} 
+papersize: a4paper
+fontsize: 11pt
+mainfont: Carlito
+geometry: margin = 3cm
+subparagraph: TRUE
+graphics: yes
+bibliography: References.bib
+csl: apa.csl
+link-citations: yes
+params:
+  mainFile: ""
+  intFile: ""
+
+# European Social Survey - European Research Infrastructure (ESS-ERIC)
+# europeansocialsurvey.org
+#Notes
+#Version: 2.2
+---
+
+```{r setup, include = FALSE, error=T}
+library(knitr)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo = FALSE, results = "hide", message = FALSE, dev = "cairo_pdf", warning = FALSE)
+knitr::opts_chunk$set(fig.pos = 'H')
+
+options(knitr.table.format = "latex", knitr.kable.NA = "")
+
+Sys.setlocale("LC_ALL","English")
+```
+
+```{r setup2, include = FALSE, error=T}
+
+library(here) 
+library(foreign)
+library(dplyr)
+library(psych)
+library(ggplot2)
+library(lubridate)
+library(wesanderson)
+library(colortools) # adjacent works
+library(ggthemes) # theme_tufte works
+library(varhandle) # coercing factor to numeric variables
+library(naniar) # for replacing values with missings
+library("Gifi") #Implements categorical principal component analysis
+library(matrixStats) #High-performing functions operating on rows and columns of matrice
+library(cowplot)
+library(tibble)
+library(reshape2) #!new in tool for FMS @May
+
+# for tables
+library(knitr)
+library(kableExtra)
+library(formattable) #!new in tool for FMS @May
+
+```
+
+```{r fuctions, error=T}
+#Utility functions
+source("Utility functions.R")
+
+## More functions
+# Response Rate, Non-contact Rate, Refusal Rate, Coop-rate
+r1 <- function(net,gross,i) { (net / (gross - i))*100 }
+# Rate of Ineligibles
+r2 <- function(net,gross){ (net/gross)*100 }
+
+```
+
+```{r theme, error=T}
+ESSred <- rgb(.91, .20, .32)
+ESSgreen <- rgb(.14, .62, .51)
+ESSblue <- rgb(0, .25, .48)
+  
+ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+
+ESSColors <- c(ESSColors, ESSgreen, ESSblue)
+#pizza(ESSColors)
+
+themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
+    theme(axis.title = element_text(size = 9, face = "plain"),
+          axis.text = element_text(size = 9),
+          axis.line.x = element_line(),
+          plot.title = element_blank(),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 9),
+          strip.text = element_text(size = 9, face = "bold"),
+          legend.position = "none",
+          legend.direction = "horizontal",
+          legend.box = "vertical",
+          legend.spacing = unit(0, "line"),
+          legend.key.size = unit(.75, "line"))
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+\newpage
+\FloatBarrier
+\pagenumbering{gobble}
+
+```{r child = "Titlepage_virtual.Rmd", error=T}
+```
+
+\pagenumbering{arabic}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\listoftables
+\listoffigures
+
+# Introduction {-}
+
+```{r getdata, error=T}
+
+#Add data with hashes
+Hash <- read.csv2(params$intFile, sep = ",", dec=".", stringsAsFactors=F)
+Hash <- read.csv2(params$mainFile,  sep = ",", dec=".", stringsAsFactors=F)
+
+```
+
+```{r countrynames, error=T}
+#read country specific data (for variable Country)
+Country <- read.csv2("Country names and codes.csv", dec = ".", stringsAsFactors = F) # !Alert! if new country, add country
+
+#This country
+Hash <- left_join(Hash, Country, by = "cntry")
+thisCountry <- unique(Hash$CountryName)
+
+```
+
+# Results {#sec:results}
+
+# References
+

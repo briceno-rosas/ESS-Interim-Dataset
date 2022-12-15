@@ -1,0 +1,183 @@
+---
+output:
+  pdf_document:
+    includes:
+      in_header: styles.tex
+    number_sections: TRUE
+    latex_engine: xelatex
+    fig_caption: yes
+    fig_width: 4
+    fig_height: 3
+    keep_tex: TRUE
+header-includes:
+  - \usepackage{titling}
+  - \setlength{\droptitle}{5em} 
+papersize: a4paper
+fontsize: 11pt
+mainfont: Calibri
+geometry: margin = 3cm
+subparagraph: TRUE
+graphics: yes
+bibliography: References.bib
+csl: apa.csl
+link-citations: yes
+params:
+  mainFile: ""
+  intFile: ""
+
+# European Social Survey - European Research Infrastructure (ESS-ERIC)
+# europeansocialsurvey.org
+# Notes
+# Version: 6.0 data structure inspection
+# Data format: CSV
+---
+
+```{r setup, include = FALSE, error=T}
+library(knitr)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo = TRUE, results = "show", message = FALSE, dev = "cairo_pdf", warning = TRUE)
+knitr::opts_chunk$set(fig.pos = 'H')
+
+options(knitr.table.format = "latex", knitr.kable.NA = "")
+
+Sys.setlocale("LC_ALL","English")
+```
+
+```{r setup2, include = FALSE, error=T}
+#Installed packages
+library(here) 
+library(foreign)
+library(dplyr)
+library(psych)
+library(ggplot2)
+library(lubridate)
+library(wesanderson)
+library(colortools) # adjacent works
+library(ggthemes) # theme_tufte works
+library(varhandle) # coercing factor to numeric variables
+library(naniar) # for replacing values with missings
+library(knitr)
+library(kableExtra)
+library("Gifi") #Implements categorical principal component analysis
+library(matrixStats) #High-performing functions operating on rows and columns of matrices
+library(cowplot)
+library(tibble)
+
+#Utilities
+source("Utility functions.R")
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+```{r theme, include = FALSE, error=T}
+ESSred <- rgb(.91, .20, .32)
+ESSgreen <- rgb(.14, .62, .51)
+ESSblue <- rgb(0, .25, .48)
+  
+ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+
+ESSColors <- c(ESSColors, ESSgreen, ESSblue)
+# pizza(ESSColors)
+
+themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
+    theme(axis.title = element_text(size = 9, face = "plain"),
+          axis.text = element_text(size = 9),
+          axis.line.x = element_line(),
+          plot.title = element_blank(),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 9),
+          strip.text = element_text(size = 9, face = "bold"),
+          legend.position = "none",
+          legend.direction = "horizontal",
+          legend.box = "vertical",
+          legend.spacing = unit(0, "line"),
+          legend.key.size = unit(.75, "line"))
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+\newpage
+\FloatBarrier
+\pagenumbering{gobble}
+
+```{r child = "Titlepage.Rmd", error=T}
+```
+
+\pagenumbering{arabic}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\listoftables
+\listoffigures
+
+# Introduction {-}
+
+```{r getdata, error=T}
+# Interviewer-Questionnaire with Inwer ID (intnum):
+Inwer <- read.csv2(params$intFile, dec=".", stringsAsFactors=F)
+
+# Main Dataset
+Main <- read.csv2(params$mainFile, dec=".", stringsAsFactors=F)
+
+#Variable names to lower cases
+names(Inwer) <- tolower(names(Inwer))
+names(Main) <- tolower(names(Main))
+
+Inwer_ID <- dplyr::select(Inwer, "intnum", "idno")
+Main <- dplyr::left_join(Main, Inwer_ID, by = "idno")
+```
+
+```{r countrynames_rounds, error=T}
+# this Country
+Countrynames <- (read.csv2("Country names and codes.csv", dec = ".", stringsAsFactors = F))
+Country <- as.data.frame(Main$cntry)
+Country <- dplyr::rename(Country, cntry = 'Main$cntry')
+Country <- left_join(Country, Countrynames, by = "cntry")
+
+thisCountry <- unique(Country$CountryName)
+```
+
+```{r missingintnum, error=T}
+# Allcases in Main
+Mainfull <- Main
+
+# Filter out cases without intnum
+Main <- Main %>% filter(!is.na(intnum))
+```
+
+This report presents the results of the analysis of the interim dataset for `r thisCountry`. It aims to help national teams detecting undesirable interviewer behaviour. The report is divided into three sections. The first section presents the results on the analysis of the timestamps from the interview. The second section focuses on item non-response. The third section investigates response patterns of respondents and how these related to allocations within interviewers. Guidance as to how to interpret these results is also provided. 
+
+It is recommended to  view these indicators as complementary to the information coming from the field. They help gain further insights into activities in the field. Indicators are complementary to each other as well.
+
+It should also be noted that the analysis focused only on cases that have a valid interviewer number as it is assumed that all interviews have been conducted by an interviewer. Therefore, any case missing the interviewer number are not included in the analysis. The data provided to the tool contained a total of `r length(Mainfull$idno)` cases and a total of `r length(Main$idno)` contained a valid interviewer number.
+
+Please feel free to contact your Country Contact or the ESS DIB team via myESS if you have any questions.
+
+
+# Interview timestamps {#sec:timestamps}
+
+```{r data check, error=T}
+
+#Var check
+print(names(Main))
+print(names(Inwer))
+names(Country)
+
+#NAs in key variables?
+table(is.na(Main$cntry))
+table(is.na(Main$idno))
+table(is.na(Main$intnum))
+
+#Print cntry
+table(Main$cntry)
+table(Inwer$cntry)
+table(Country$cntry)
+
+#Data structure 
+sapply(Main, mean, na.rm=FALSE)
+describe(Main)
+
+#Query locales
+Sys.setlocale()
+Sys.Date()
+
+```

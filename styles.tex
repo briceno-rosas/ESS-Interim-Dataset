@@ -1,0 +1,48 @@
+\usepackage{placeins}
+\usepackage{booktabs}
+\usepackage{carlito}
+\usepackage{array}
+\usepackage{chngcntr}
+\usepackage{color}
+\usepackage{titlesec}
+\usepackage{titling}
+\usepackage{caption}
+\usepackage[bottom]{footmisc}
+\usepackage[justification = centering]{caption}
+\usepackage{lscape}
+\usepackage{pdflscape}
+\usepackage{longtable}
+\usepackage{threeparttable}
+\usepackage{nopageno}
+\usepackage{footnote}
+
+\counterwithin{figure}{section}
+\counterwithin{table}{section}
+\definecolor{ESSPink}{rgb}{0.91,0.2,0.32}
+
+
+\titleformat
+	{\section}
+	{\bf \LARGE \sc \color{ESSPink}}
+	{\rlap{\thesection}\hspace{1cm}}
+        {0pt}
+        {}
+	[{\titlerule[2pt]}]
+
+\titleformat
+	{\subsection}
+	{\bf \large \sc}
+	{\rlap{\thesubsection}\hspace{1cm}}
+	{0pt}
+        {}
+
+\newcommand*{\secref}[1]{Section~\ref{#1}}
+
+\captionsetup[figure]{labelfont= {color = ESSPink, bf}, labelsep = space}
+\captionsetup[table]{labelfont= {color = ESSPink, bf}, labelsep = space}
+
+\let\stdsection\section
+\renewcommand{\section}{\FloatBarrier\clearpage\FloatBarrier\stdsection}
+
+\newcommand{\blandscape}{\begin{landscape}}
+\newcommand{\elandscape}{\end{landscape}}
