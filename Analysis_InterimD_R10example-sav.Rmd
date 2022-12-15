@@ -1,0 +1,714 @@
+---
+output:
+  pdf_document:
+    includes:
+      in_header: styles.tex
+    number_sections: TRUE
+    latex_engine: lualatex
+    fig_caption: yes
+    fig_width: 4
+    fig_height: 3
+    keep_tex: TRUE
+header-includes:
+  - \usepackage{titling}
+  - \setlength{\droptitle}{5em} 
+papersize: a4paper
+fontsize: 11pt
+mainfont: Carlito
+geometry: margin = 3cm
+subparagraph: TRUE
+graphics: yes
+bibliography: References.bib
+csl: apa.csl
+link-citations: yes
+params:
+  mainFile: "DEMO_DATA_R10/ESS10MainCZ.sav"
+  intFile: "DEMO_DATA_R10/ESS10IntCZ.sav"
+
+# European Social Survey - European Research Infrastructure (ESS-ERIC)
+# europeansocialsurvey.org
+# Notes
+# Version: 11.0
+# Data format: SPSS
+---
+
+```{r setup, include = FALSE, error=T}
+library(knitr)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo = FALSE, results = "hide", message = FALSE, dev = "cairo_pdf", warning = FALSE)
+knitr::opts_chunk$set(fig.pos = 'H')
+
+options(knitr.table.format = "latex", knitr.kable.NA = "")
+
+Sys.setlocale("LC_ALL","English")
+
+```
+
+```{r setup2, include = FALSE, error=T}
+#Installed packages
+library(here) 
+library(foreign)
+library(dplyr)
+library(psych)
+library(ggplot2)
+library(lubridate)
+library(wesanderson)
+library(colortools) # adjacent works
+library(ggthemes) # theme_tufte works
+library(varhandle) # coercing factor to numeric variables
+library(naniar) # for replacing values with missings
+library(knitr)
+library(kableExtra)
+library("Gifi") #Implements categorical principal component analysis
+library(matrixStats) #High-performing functions operating on rows and columns of matrices
+library(cowplot)
+library(tibble)
+library(haven)
+
+#Utilities
+source("Utility functions.R")
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+```{r theme, error=T}
+ESSred <- rgb(.91, .20, .32)
+ESSgreen <- rgb(.14, .62, .51)
+ESSblue <- rgb(0, .25, .48)
+  
+ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+
+ESSColors <- c(ESSColors, ESSgreen, ESSblue)
+# pizza(ESSColors)
+
+themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
+    theme(axis.title = element_text(size = 9, face = "plain"),
+          axis.text = element_text(size = 9),
+          axis.line.x = element_line(),
+          plot.title = element_blank(),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 9),
+          strip.text = element_text(size = 9, face = "bold"),
+          legend.position = "none",
+          legend.direction = "horizontal",
+          legend.box = "vertical",
+          legend.spacing = unit(0, "line"),
+          legend.key.size = unit(.75, "line"))
+```
+
+\newpage
+\FloatBarrier
+\pagenumbering{gobble}
+
+```{r title, child = "Titlepage.Rmd", error=T}
+```
+
+\pagenumbering{arabic}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\listoffigures
+
+```{r getdata, error=T}
+# Interviewer-Questionnaire with Inwer ID (intnum):
+Inwer <- foreign::read.spss(params$intFile,
+                  use.value.labels = F,
+                  use.missings = F,
+                  to.data.frame = T)
+
+# Main Dataset
+Main <- foreign::read.spss(params$mainFile,
+                  use.value.labels = F,
+                  use.missings = F,
+                  to.data.frame = T)
+
+# Inwer<-haven::read_spss(params$intFile)
+# Main<-haven::read_spss(params$mainFile)
+
+
+#Variable names to lower cases
+names(Inwer) <- tolower(names(Inwer))
+names(Main) <- tolower(names(Main))
+
+Inwer_ID <- dplyr::select(Inwer, "intnum", "idno")
+Main <- dplyr::left_join(Main, Inwer_ID, by = "idno")
+```
+
+```{r countrynames_rounds, error=T}
+# this Country
+Countrynames <- (read.csv2("Country names and codes.csv", dec = ".", stringsAsFactors = F))
+Country <- as.data.frame(Main$cntry)
+Country <- dplyr::rename(Country, cntry = 'Main$cntry')
+Country <- left_join(Country, Countrynames, by = "cntry")
+
+thisCountry <- unique(Country$CountryName)
+```
+
+```{r missingintnum, error=T}
+# Allcases in Main
+Mainfull <- Main
+
+# Filter out cases without intnum
+Main <- Main %>% filter(!is.na(intnum))
+```
+
+# Reader's Guide {-}
+
+This report presents the results of the analysis of the interim dataset for `r thisCountry`. It aims to help national teams detecting undesirable interviewer behaviour in a timely manner. The report has been standardised for implementation in all participating countries as remote analysis of the interim dataset without the intervention of the international ESS team and without having to move securely stored data from the national level. The report focuses on indicators expected to signal issues with undesirable interviewer behaviour but it can also help detect other issues regarding data collection which are not related to interviewer behaviour. The reader's guide explains how to best utilize the report and take the appropriate steps for data colleciton. It is highly encourage to keep close communication with the CST via the Country Contact for discussion of results and consultation regarding any important decision. Please share the report with your Country Contact. This report should also be stored and deposited for documentation purposes along the data and other respective documents to the ESS Archive after fieldwork has been completed. 
+
+## Theorical Background
+
+Interviewers can have a systematic and substantial impact on the resulting data. Sometimes, their impact is beyond their control, for example, respondents might answer questions somewhat differently when interviewed by a male interviewer compared to when interviewed by a female interviewers. Other times, their impact is well within their control and it is a direct consequence of their behaviour. When analyzing the interim datasets, we want to focus on interviewer-controlled issues, which can be corrected for during the fieldwork if necessary.
+
+_Types of interviewer-controlled issues_
+
+Interviewer-controlled issues varied depending on the level of control an interviewer has over it and the causes of the issue. One classification used in the ESS to gain a better understanding of the different ways undersirable interviwer behaviour can occurred is provided by Stoop et al [-@stoop2018]:
+
+* Undesirable interviewer behaviour driven by context: Some examples are speeding through the interview when the respondent seems close to breaking off the interview, chatting with respondents who are unsure about their answers, paraphrasing a question when the respondent misunderstands, etc. In these cases, the interviewer depart from the expected behaviour due to an external element, for which the interviewer has little control of. They can be considered unavoidable to some extend, although in some situations the reaction of the interviewer could be improved to meet the desirable behaviour. More importantly, these issues should not be systematically related to the interviewer, but case-specific instead.
+* Undesirable interviewer behaviour that could be avoided: Some examples of these type of behavior are speeding through the interview, skipping introductions to questions, forgetting to hand over showcards, not properly reading answer categories, etc.
+* Unintentional errors: like erroneously interviewing the wrong person, recording the wrong day for the interview, keying the wrong answer category, etc. 
+* Deliberate falsification: curbstoning (creating the answers for an entire or partial interviews), partially duplicating interviews (copying answers), selecting available household members as respondents instead of a random member of the household because they are more cooperative or more often at home when the interviewer contacts the sample unit, incorrectly recording answers to filter questions to reduce the duration of the survey, etc. In the cases, the behaviour is intentional and constitute a depature from the standards of survey interviewing set by the ESS.
+
+Understanding the type of interviewer-controlled issues is important for deciding the course of action. For example, an interviewer who mistakenly missed parts of the questionnaire might require better training or briefing on the ESS questionnaire, while an interviewer who skipped parts of the questionnaire to save time might need to be excluded from the fieldwork activities.
+Data analysis can provide clues about the type of issues and help focus the monitoring efforts. However, further investigation is most likely necessary to assert the type of behaviour that caused the issues. 
+
+_Prevention and detection_
+
+One of the key steps for successful promotion of desirable interviewer behaviour is detecting issues in the field as early as possible. Detection leads to prevention of further issues and therefore to mitigation of the impact of undesirable interviewer behaviour. Even if issues can not be corrected, understanding the causes that lead to issue allows to make better informed decision and document problems for data users. The more time it has passed between the detection of a data issues and the fieldwork, the harder it is to understand the issue. 
+
+_Strategies for dectecting interviewer-controlled issues_
+
+Data analysis of interim datasets is one out of multiple strategies that can be used to detect interviewer-controlled issues during data collection. Other strategies include observation of interviewer behaviour in the field, interviewer debriefing, or back-checks or recontact sample units, analysis of fieldwork paradata (e.g. contact forms data), or activity tracking mechanism. Therefore, the interim dataset from the main questionnaire is provides "one piece of the puzzle" when attempting to reconstruct fieldwork activities in the process of data collection and understand. 
+
+_Standardised v country-specific analysis_
+
+Standardised data analysis provides a basis for detection of issues related to interviewer issues. It also allows international surveys like the ESS to establish a minimum quality benchmark that is applied in all participating countries and serves to improve comparability across countries. However, standardised analysis for all participating countries cannot account for country-specific characteristics that are particular to national or regional context, specific survey design characteristics, cultural background, technical particularities of the tool used for the national teams for data collection o country-specific fieldwork decision. It is highly encourage to interpret, adapt and conduct further analysis that would address particular concerns expected in each country. 
+
+
+## Methods
+
+_Areas of Analysis_
+
+Three areas of analysis have been defined in this report. The first section presents the results on the analysis of the timestamps from the interview. The second section focuses on item non-response. The third section investigates response patterns of respondents and how these related to allocations within interviewers. 
+
+_Quality Benchmarks (flags)_
+
+The quality benchmarks, also known as flags, function as default threshold for each indicators presented in the report. Their purpose is focusing the attention to possible issues rated to interviewer behaviour. These benchmarks are arbitrary and they has been defined based on experience of fieldwork activities across participant countries. The thresholds are by no means fixed and they can be revised to meet country-specific needs and fieldwork characteristics.  
+
+For the interim dataset, quality benchmarks have been defined with a low sensitivity, meaning that is expected that higher number of cases will be flag without an actual problem having ocurred (false positives). The flag aim is to raise attention about possible issues for further investigation, instead of reporting the existence of an issue _per se_. 
+
+## Evaluation of Results
+
+_Figures, Tables and Detailed Tables in Annex Folder__
+
+In the report, results are presented in figures and table to provide a quick overview of the issues. Promatic cases or interviewer are usually highlighted. However, it is not always possible to provide a adaquate overview of all issues for all countries. Therefore, indicators are saved into the Annex folder together with the report for further invatigation. 
+
+_Adjustment of Quality Benchmarks_
+
+Adjustment of the quality benchmarks might be necessary to better tune to sensibility to country-specific context or to conduct a more focused investigation of issues. There are two ways to adjust the quality benchmarks used as default for this report: (1) recoding of the 
+
+## Further Investigation
+
+All flags provided by this report are granted further consideration and investigation with the goal of gaining understanding about the causes of the issues. The steps and efforts will depend on the type of flag and the related level of concern.
+
+_Contextualization_
+
+National teams and survey agencies have access to important information about fieldwork activities, which this report does not account for. For example, prior issues with specific interviewers or details about specific geographical area of sample units can substantially influence the levels of concern raised by flags. Therefore, the first step for the national teams should be to contextualize the reported flags with information available about fieldwork, including the characteristics of the interviewers, the sample units, the details of the CAPI-system, recent fieldwork activities, etc. The information required for contextualization will depend on the respective quality benchmarks and possible explanation for their occurrence. For example, the expected travel distance between two sample units can provide crucial information when asserting the feasibility of very short interval of time between two interviews from the same interviewer.
+
+_Debriefing of Interviewers_
+
+An important step in clarifying the issues is to query interviewer about possible explanation of the issues observed. Interviewers are one of the most important source of information for explaining issues observed in the data as they were present in the production of the data. They can help reconstruct the fieldwork activities that lead to the issues observed. They should also be seen as partners in solving the issue as their future behaviour might help avoid problem. We recommend that this interaction takes place in a constructive and respectful manner as it. We recommend to document the debriefing results in a short minute that could help later in the assessment, especially if back-checks are conducted.
+
+_Back-checks_
+
+Please follow the ESS guidance on conducting the back-checks. Please note that when conducting back-checks with the aim of clarifying specific interviewer-related issues, you might need to ask the sample units about specific information that clarifies the issues. For example, if there are concern about parts of the questionnaire not having been asked, you might need to ask the respondent whether they recall being asked about those specific topics and present one or more of the questions to help them recall.
+
+## Implications
+
+_Course of Action, Discussion and Documentation_
+
+Once an understanding of the issues has been establish, it is time to decide and discuss the course of action. The course of action should always be decided on the case-by-case approach, considering all available information and with the discussion with the respective stakeholders.  Some example of course of action might involve management of the interviewers, like for example re-briefing, re-training, supervised interviewing exercises, or removal of interviewers from field activities. Management of the interviewers are under the responsibility of the national team and survey agency, however, consultation with the CST is encouraged. Other solutions might require a adjustment of the survey design or manipulation of the data, like recontacting sample units, correction of erroneous data, removal of data (partial or complete), redrawing the sample. Please note that any course of action that involved the modification of the fieldwork plans, contact strategy, manipulation of data, or sampling design are not to be taken lightly and need to be consulted with the Core Scientific Team before any action is taken.
+
+In some cases, the course of action might just be the documentation of the issues, their probable cause, and the step taken to clarify the issues. This allows the ESS to provide explanation to data users about possible issues they might spot when making use of the data. It is recommended to document any course of action taken as a results of quality control and flags raised by this report.
+
+
+
+# Results for `r thisCountry`
+
+The data provided to the tool contained a total of `r length(Mainfull$idno)` cases and a total of `r length(Main$idno)` contained a valid interviewer number. It should also be noted that the analysis focused only on cases that have a valid interviewer number as it is assumed that all interviews have been conducted by an interviewer. Therefore, any case missing the interviewer number are not included in the analysis. 
+
+
+```{r nperm, results = "asis", error=T}
+#Overview of interviews per interviewer
+tab_niwer <- Main %>% 
+  group_by(intnum) %>% 
+  summarise(n = n())
+#Summary table
+sumtab_niwer <- data.frame(as.list(mysummary(tab_niwer$n)))
+kable(sumtab_niwer,
+      caption = paste("\\label{tab:table_nperm} Descriptive summary of interviews per interviwer"))  %>%
+  kable_styling(latex_options = c("hold_position"))
+
+```
+
+```{r nperm_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:nperm_plot} Distribution of interview per interviewer",  linebreak, "Note: The vertical blue line represents the median number of completed interviews"), fig.scap="Distribution of interviews per interviewer", error=T}
+
+#Overview of interviews per interviewer
+ggplot(tab_niwer, aes(n, as.factor(intnum))) + 
+  geom_text(aes(label = intnum, color = n), size = 2) +
+  labs(x = "Total number of completed interviews",
+       y = "Interviewers",
+       color = "n") + 
+  scale_color_gradient(low = "darkblue", high = ESSColors[1]) +
+  scale_x_continuous(breaks = seq(0, max(tab_niwer$n + 1, na.rm = T), 5), 
+                     limits = c(0, max(tab_niwer$n + 1)),
+                     minor_breaks = seq(0, max(tab_niwer$n + 1, na.rm = T), 1)) +
+  theme(axis.title = element_text(size = 9, face = "plain"),
+        axis.text = element_text(size = 9),
+        axis.line = element_line(colour = "grey80"),
+        axis.text.y = element_blank(),
+        axis.ticks.y =element_blank(),
+        legend.text = element_text(size = 8),
+        strip.text = element_text(size = 9, face = "bold"),
+        legend.box = "vertical",
+        legend.spacing = unit(0, "line"),
+        legend.key.size = unit(.75, "line"),
+        panel.border = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  geom_vline(xintercept = sumtab_niwer$Q2, color = wes_palette(n=1, name = "Zissou1"), size = 0.3)
+
+```
+
+
+
+
+# Interview timestamps {#sec:timestamps}
+
+```{r timestamps, error=T}
+# fulldate for interviews
+Main$fulldate <- as_datetime(Main$inwds, origin = "1582-10-14")
+# fulldatetime for start and end of interview
+Main$start <- as_datetime(Main$inwds, origin = "1582-10-14")
+Main$end <- as_datetime(Main$inwde, origin = "1582-10-14")
+# fulldatetime for modules
+Main$end_a <- as_datetime(Main$ainwe, origin = "1582-10-14")
+Main$end_b <- as_datetime(Main$binwe, origin = "1582-10-14")
+Main$end_c <- as_datetime(Main$cinwe, origin = "1582-10-14")
+Main$end_d <- as_datetime(Main$dinwe, origin = "1582-10-14")
+Main$end_f <- as_datetime(Main$finwe, origin = "1582-10-14")
+Main$end_g <- as_datetime(Main$ginwe, origin = "1582-10-14")
+Main$end_h <- as_datetime(Main$hinwe, origin = "1582-10-14")
+Main$end_i <- as_datetime(Main$iinwe, origin = "1582-10-14") 
+
+```
+
+In this section, indicators for detection of issues in interviewing process are drawn from the analysis of timestamps recorded for each interview (start and end of the interview, including timestamps for each module, and date and time of interview). Timestamps provide critical information about the conduction of the interview in the field and can help detect issues in the interviewing process. 
+
+First, we look at the interview duration and interview speed on both the interview level and module level. Second, we analyze the time of the interview relative to the time of other interviews from the same interviewer. Please note that any issues highlighted require further investigation by the national teams.
+
+Countries that follow the recommendation of including more detailed timestamps (e.g. timestamps per item) into their CAPI systems are able to conduct further analysis on those indicators. The ESS DIB team can provide further assistance if needed.
+
+## Interview duration and interview speed {#sec:duration_speed}
+
+Interview duration refers to the length of the interview excluding optional country-specific questions, the interviewer questions, and general administration of the contact procedures. Interview speed refers to the average speed (in terms of question per minute) in which the interview progresses. The average interview speed is calculated as the number of applicable questions for a specific respondent divided by the duration of the interview. It can be calculated at the interview level or another level, such as the module level (see \secref{sec:speed}).
+
+Both duration and speed should be considered when assessing data quality. For example, extreme outliers in interview duration and/or interview speed can indicate a deviation from interviewing protocols (e.g. error in the recording of timestamps) or even falsification of interviews.
+
+### Unlikely interview duration {#sec:duration}
+
+Very short or very long interviews can be attributed to interviewer behaviour, but also to technical problems (e.g., software problems), atypical interviews, or respondent behaviour (e.g., partial interviews) [see @vandenplas2019, p. 252]. Detecting outliers can help identify systematic issues related to interviewers as a whole. Therefore, it is important to consider all interviews conducted by interviewers that have produced interviews with an unlikely duration. As mentioned before, very short of very long interview durations (i.e., outliers) could indicate a potential problem and in this analysis we define short interviews as interviews having lasted less than 30 minutes and long interviews as interviews having lasted 180 minutes or more.
+
+
+```{r duration, error=T}
+#interview period
+Main$int_period <- Main$start %--% Main$end
+# duration in minutes
+Main$duration <- int_length(Main$int_period)/60
+# interviewer with improbable low values
+duration_30 <- dplyr::filter(Main, duration<30) 
+duration_30_vec <- duration_30[, "intnum"]
+# interviewer with improbable high values
+duration_180 <- dplyr::filter(Main, duration>180) 
+duration_180_vec <- duration_180[, "intnum"]
+# vector with all suspicious interviewers in duration
+duration_improb <- c(duration_30_vec, duration_180_vec)
+# vector with duplicates in duration_improb
+duration_improb_dup <- duration_improb[duplicated(duration_improb)]
+
+# dataset only with improbable interviews
+df_duration_improb <- bind_rows(duration_30, duration_180)
+df_duration_improb$unlikely_duration <- ifelse(df_duration_improb$intnum %in% duration_30_vec & df_duration_improb$intnum %in% duration_180_vec, "both",
+                                               ifelse(df_duration_improb$intnum %in% duration_30_vec, "<30",
+                                                      ifelse(df_duration_improb$intnum %in% duration_180_vec, ">180", "none")))
+df_duration_improb <- select(df_duration_improb, idno, intnum, unlikely_duration)
+df_duration_improb_table <- df_duration_improb %>%
+  dplyr::count(unlikely_duration, intnum)
+
+# dataset with interviews between 0 and 240 minutes
+df_duration <- Main %>% 
+  group_by(intnum) %>%
+  filter(duration<240) %>%
+  mutate(duration_mean=mean(duration))
+# order intnum by mean of duration per interviewer in filtered data set
+df_duration$intnum <- factor(df_duration$intnum,
+                             levels = unique(df_duration$intnum[order(df_duration$duration_mean)]))
+df_duration$duration_improb <- ifelse(df_duration$intnum %in% duration_30_vec & df_duration$intnum %in% duration_180_vec, "both", 
+                                      ifelse(df_duration$intnum %in% duration_30_vec, "<30",
+                                             ifelse(df_duration$intnum %in% duration_180_vec, ">180", "none")))
+duration_descr <- psych::describe(df_duration$duration, quant=c(.25,.75)) %>%
+  select(mean, median, Q0.25, Q0.75)
+
+```
+
+An overview of the distribution of interview duration by interviewer can be seen in Figure \ref{fig:plot_duration}. Table \ref{tab:table_duration} shows the frequencies of an interview with unlikely duration per interviewer. For more details, see table in the annex folder with the interview duration per case and interviewer ("Interview duration.csv"). 
+
+```{r duration_annex, error=T}
+
+write.table(Main[,c("idno", "intnum", "int_period", "duration")], 
+            "Annex/Interview duration.csv", sep = ";", row.names = F)
+
+```
+
+
+```{r duration_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:plot_duration} Distribution of interview duration by interviewer (limits 0-240 minutes)",  linebreak, "Note: The figure shows only interviews with a duration of 0-240 minutes to give a better overview (see respective annex file for all interview duration records). Interviewers with at least one interview with a duration <30 or >180 minutes are labelled in the y axis with their interviewer ID. The vertical black lines represent the fences of unlikely interview duration (less than 30 and more than 180 minutes). The vertical blue line represents the mean of duration for all interviewers after deleting interviews with improbable durations."), fig.scap="Distribution of interview duration by interviewer", error=T}
+
+ggplot(df_duration, aes(duration, as.factor(intnum))) +
+  geom_point(aes(colour = df_duration$duration_improb)) + 
+  labs(x = "Interview duration (minutes; scale limited to range 0-240)",
+       y = "Interviewers",
+       color = "at least one interview\nwith duration <30 or >180") + 
+  scale_colour_manual(values = c("both" = ESSColors[1],
+                                 "<30" = ESSColors[2],
+                                 ">180" = ESSColors[3],
+                                 "none"= "grey")) +
+  scale_x_continuous(breaks = seq(0, max(Main$intnum), 20)) + 
+  scale_y_discrete(breaks = duration_improb) +
+  theme_light(base_size = 9, base_family = "Calibri") +
+  theme(axis.title = element_text(size = 9, face = "plain"),
+        axis.text = element_text(size = 9),
+        axis.line = element_line(colour = "grey80"),
+        legend.text = element_text(size = 9),
+        strip.text = element_text(size = 9, face = "bold"),
+        legend.box = "vertical",
+        legend.spacing = unit(0, "line"),
+        legend.key.size = unit(.75, "line"),
+        panel.border = element_blank()) +
+  geom_vline(xintercept = duration_descr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = 30) +
+  geom_vline(xintercept = 180)
+
+df_duration <- ungroup(df_duration)
+
+```
+
+```{r duration_table, results = "asis", error=T}
+if(nrow(df_duration_improb_table)==0) {	
+    kable("No interviewers with unlikely interview durations were detected", 	
+      col.names = c(""), 	
+      caption = paste("\\label{tab:table_duration} Interviewers with unlikely interview durations"))  %>%	
+  kable_styling(latex_options = c("hold_position"))	
+  } else { 	
+    kable(df_duration_improb_table, 
+      col.names = c("Duration","Interviewer ID", "Number of interviews"), 
+      caption = paste("\\label{tab:table_duration} Interviewers with unlikely interview durations"))  %>%
+  kable_styling(latex_options = c("hold_position")) %>%
+  collapse_rows(columns = 1)
+  }	
+```
+
+The general recommendation here is to go back to the survey agency (or fieldwork coordinator or interviewer in case of an in-house survey) and have them check these results with the interviewer in question. Especially in the case of interview duration, other indicators like speed and item non-response (see next sections) should be taken into consideration.
+
+\newpage
+
+### Interviewing speed {#sec:speed}
+
+Previous research in the ESS has shown that the interview speed of interviews is linked to the impact interviewers have on the answers of the respondents, known as interviewer effects [@vandenplas2019]. Interviewer effects are measured by the extent to which the variance of items is explained by the allocation of cases within an interviewer. Vandenplas et al. [-@vandenplas2019] showed that there are larger interviewer effects for slow and for fast interviews compared to moderate interview durations. 
+
+Due to filter questions in the ESS questionnaire, the number of applicable questions varies from interview to interview. Therefore, the speed of the interview provides a more comparable indicator across interviews. We calculate the speed over an interview $v$ as the number of applicable items in that interview $q$ divided by the time needed to complete the interview $t$ in minutes for each respondent $i$:
+
+\begin{equation}
+  \label{eq:speed}
+  v_i=q_i/t_i
+  \end{equation}
+  
+Equation \ref{eq:speed} indicates the number of items answered per minute. Interview speed can be calculated on the interview level and on the module level. Both can be informative when trying to assess the potential for undesirable interviewer behaviour. Below we provide you with an example as to how the estimated interview speed at the module level can aid us in detecting undesirable IB as well as help us in our understanding of potential mitigation strategies going forward.
+
+*Interviewing speed on the module level: Module H*
+
+```{r speed_H, error=T}
+
+# Module H without improbable interview durations
+Main_H <- dplyr::select(df_duration,c(idno, intnum, end_g, end_h, ipcrtiv:impfun))
+# number of applicable items q_H
+Main_H <- Main_H %>% mutate(q_H = rowSums(!is.na(select(., -c(intnum, idno, end_g, end_h)))))
+# time needed to complete module t_H
+Main_H <- Main_H %>% mutate(t_H = as.numeric(end_h - end_g)/60) %>%
+  filter(t_H != 0)
+# speed over a the module v_H
+Main_H <- Main_H %>% mutate(v_H = q_H/t_H)
+# average interviewer speed for all interviewers
+Speed_H_all <- Main_H %>%
+  group_by(intnum) %>%
+  summarise(avg_speed=mean(v_H)) %>%
+  mutate(group = "All interviewers")
+# average interviwer speed for interviewers with at least 4 interviews
+Speed_H_4 <- Main_H %>%
+  group_by(intnum) %>%
+  filter(n() > 3) %>%
+  summarise(avg_speed=mean(v_H)) %>%
+  mutate(group = "Interviewers with at least 4 interviews")
+
+Speed_H <-bind_rows(Speed_H_all, Speed_H_4)
+
+# flag ouliers
+
+Speed_H <- Speed_H %>%
+  #tibble::rownames_to_column(var="outlier") #%>%
+  group_by(group) %>%
+  mutate(is_outlier=ifelse(is_outlier(avg_speed), avg_speed, as.numeric(NA))) %>%
+  mutate(intnum_out = intnum)
+Speed_H$intnum_out[which(is.na(Speed_H$is_outlier))] <- as.numeric(NA)
+
+```
+
+Figure \ref{fig:plot_speed_H} shows the average interviewing speed for each interviewer and interviewers with at least four interviews for module H. We made this differentiation, because the probability that outliers in speed are incidental findings is lower for interviewers with at least four interviews. Interviews with unlikely interview durations (<30 minutes or >180 minutes) were excluded from the analysis because these are already detected in Section \ref{sec:duration} as outliers. We define an interviewing speed 1.5 times out of the Interquartilerange (IQR) as outliers with very fast or very slow interviewing speed. Those interviewers are labelled in the figure and listed together with their average interview speed in Table \ref{tab:table_speed_H}. For more details, see table in the annex folder with the interview speed for module H per case and interviewer ("Interview speed module H.csv"). 
+
+```{r speed_H_annex, error=T}
+
+write.table(Main_H[,c("idno", "intnum", "v_H")] %>% dplyr::rename(speed = v_H), 
+            "Annex/Interview speed module H.csv", sep = ";", row.names = F)
+```
+
+
+```{r speed_H_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:plot_speed_H} Average interviewing speed for Module H",  linebreak, "Note: Interviewing speed is defined as items answered per minute. The squares represent the mean of the distribution. Interviewers that are  > 1.5*IQR from the borders of the box are labelled."), fig.scap="Average interviewing speed for Module H", error=T}
+
+ggplot(Speed_H, aes(x=group, y=avg_speed, fill=group)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", shape=23, size=4) +
+  scale_fill_manual(values = c(ESSColors[3], ESSColors[4])) +
+  geom_text(aes(label=intnum_out), na.rm=TRUE, nudge_y=0.05, hjust = -0.3) +
+  theme(legend.position="none") + 
+  labs(x = "",
+       y = "Interview speed")
+
+```
+
+```{r speed_H_table, results = "asis", error=T}
+if(all(is.na(Speed_H$is_outlier))==T) {	
+    kable("No interviewers with unlikely interview speed were detected", 	
+      col.names = c(""), 	
+      caption = paste("\\label{tab:table_speed_H} Interviewers with unlikely interview speed"))  %>%	
+  kable_styling(latex_options = c("hold_position"))	
+  } else { 	
+  kable(na.omit(Speed_H[c("group", "intnum", "is_outlier")]), 	
+      col.names = c("Group","Interviewer ID", "Average speed"), 	
+      caption = paste("\\label{tab:table_speed_H} Interviewers with unlikely interview speed"))  %>%	
+  kable_styling(latex_options = c("hold_position")) %>%	
+  collapse_rows(columns = 1)	
+  }
+
+```
+
+A very high interview speed should give rise to further investigation as to how these interviewers conducted these modules. It is advisable to go back and ask what exactly happened there. In general terms: Module H is the last questionnaire module and there could be some unfortunate, but valid reasons as to why some of the interviews were conducted with this average speed (e.g., respondent broke off the interview so the interviewer coded all remaining answers as 'no answer'). However, it is of course of particular interest if this pattern is observed multiple times within the same interviewer as this may indicate a more systematic undesirable behaviour such as rushing through the questions, not reading these questions to the respondent, or not challenging the respondent when he/she does not differentiate anymore.
+
+\newpage
+
+## Interview time {#sec:int_times}
+
+The (date and) time in which the interviews were conducted is another indicator that has proven useful for detecting undesirable interviewer behaviour or other issues in the field. It can inform about compliance with contacting and interviewing protocol, performance in achieving the respondent's cooperation, as well as error in the recording of timestamps. First, we look at interviews with an overlapping interview time conducted by the same interviewer. Second, the time of the day in which interviews were conducted is checked for unlikely interview hours (e.g., the middle of the night). Third, we look at the number of interviews conducted on the same day by the same interviewer. Lastly, the time between consecutive interviews of the same interviewer is analysed and its plausibility assessed.
+
+### Overlaps of interview time {#sec:overlaps}
+
+```{r overlaps, error=T}
+# overlap of two time periods
+Main <- mutate(Main, interval = lubridate::interval(start, end))  
+Inw_Overlap <- dplyr::arrange(Main, intnum) #needs to be sorted by intnum for next stage to work
+Inw_Overlap$overlap <- unlist(tapply(Inw_Overlap$interval, #loop through Intervals
+                                     Inw_Overlap$intnum, #grouped by id
+                                     function(x) rowSums(outer(x, x, int_overlaps))>1))
+Inw_Overlap <- dplyr::select(Inw_Overlap, "intnum", "idno", "cntry", "overlap")
+Main <- dplyr::left_join(Main, Inw_Overlap, by = c("intnum", "idno", "cntry"))
+Inw_Overlap <- filter(Main, overlap==T)
+# vector with all suspicious interviewers in Inw_Overlap
+inw_overlap <- dplyr::pull(Inw_Overlap, intnum)
+# vector with duplicates in duration_overlap
+inw_overlap_dup <- inw_overlap[duplicated(inw_overlap)]
+# check, which are the reasons for overlapping interview-times
+Inw_Overlap_doc <- dplyr::select(Main, "intnum", "idno", "cntry", "interval", "overlap")
+Inw_Overlap_doc <- Inw_Overlap_doc %>% arrange(intnum, interval)
+```
+
+The overlap of the interview time of different interviews conducted by the same interviewer is an implausible outcome of fieldwork activities and could indicate the occurrence of poor interviewer behaviour. Overlapping times could be the result of interviewer deviating from interviewing protocol (e.g. entering the wrong interview time manually, forgetting to close the CAPI application, or multiple interviewers conducting interviews under the same ID). Moreover, it could be the result of interview falsification (e.g. fabrication of full interviews or parts of the interviews). 
+
+However, before jumping to these serious conclusions, it is important to realize that overlapping interview times can also be the result of technical CAPI issues. These are serious issues which should be corrected on time to avoid contamination or the loss of data, but they are not necessarily the result of undesirable interviewer behaviour. Still, if an overlapping of interview times is detected, it is necessary to look up the causes. The national team should investigate the cases in detail to clarify the reasons of occurrence. Please also inform the CST about the outcome of further investigation of these cases.
+
+
+```{r overlap_annex, error=T}
+
+#Annex file with flags
+write.table(Inw_Overlap_doc,
+            "Annex/Interview overlap.csv", sep = ";", row.names = F)
+
+```
+
+\newpage
+
+### Time of interview {#sec:time}
+
+We expect most of the interviews to take place during daily hours of social life because that is when potential respondents would accept an invitation to conduct an interview as well as that these hours would correspond with the 'regular' working hours of an interviewer. We would view interviews with a starting time between 10 pm and 6 am and/or ending between 11 pm and 7 am as unlikely. It is possible to conduct interviews during these hours, but they should be looked into more detail. This indicator could inform about possible issues in the data collection or the recording of timestamps, but one should of course take notice of socially accepted interview times in a particular country. However, if multiple interviews from the same interviewer have taken place at an unlikely time, we highly recommend conducting back-checks on these cases.
+
+```{r time, error=T}
+Main$inwshh <- as.integer(hour(Main$start))
+Main$inwehh <- as.integer(hour(Main$end))
+Inw_times <- Main %>%
+	  filter(inwshh<=6 | inwshh>=22 | inwehh<=7 | inwehh>=23)	
+Inw_times_start <- Main %>%	
+  filter(inwshh<=6 | inwshh>=22)	
+Inw_times_end <- Main %>%	
+  filter(inwehh<=7 | inwehh>=23)
+# vector of all interviewers with improbable interview times	
+inw_times <- dplyr::pull(Inw_times, intnum)	
+inw_times_start <- dplyr::pull(Inw_times_start, intnum)	
+inw_times_end <- dplyr::pull(Inw_times_end, intnum)	
+# vector with duplicates in inw_times	
+inw_times_dup <- inw_times[duplicated(inw_times)]	
+# Flag unlikey time	
+Main$unlikitm <- ifelse(Main$intnum %in% Inw_times$intnum, "unlikely", "likely")	
+Main$unlikstm <- ifelse(Main$inwshh<=6 | Main$inwshh>=22, "unlikely", "likely")	
+Main$unliketm <- ifelse(Main$inwehh<=7 | Main$inwehh>=23, "unlikely", "likely")
+#Flags only for annex
+Main$unlikelystart <- ifelse(Main$inwshh<=6 | Main$inwshh>=22, "unlikely start time", "")
+Main$unlikelyend <- ifelse(Main$inwehh<=7 | Main$inwehh>=23, "unlikely end time", "")
+```	
+
+```{r time_fig, fig.show="hold", out.width="50%", error=T}	
+# Timers in hours	
+Main$starttm <- (as.numeric(Main$start - floor_date(Main$start, "1 day"), unit="secs")/3600)	
+Main$endtm  <- (as.numeric(Main$end - floor_date(Main$end, "1 day"), unit="secs")/3600)	
+# Plot start and end separatly	
+# Plot start of interview	
+ggplot(Main, aes(starttm, as.factor(intnum))) + 	
+  geom_point(aes(colour = Main$unlikstm)) + 	
+  labs(y = "Interivewers",	
+               y = "Interviewers",	
+               color = "Group") +	
+  scale_colour_manual(values = c("unlikely" = ESSColors[1],	
+                                         "likely"= "grey")) +	
+  scale_x_continuous(name="Hours of day", limits=c(0, 24), breaks = seq(0,24,1)) + 	
+  scale_y_discrete(breaks = inw_times_start) +	
+  theme(plot.caption = element_text(hjust = 0.5)) +	
+  geom_vline(xintercept = 7, color = "grey45") +	
+  geom_vline(xintercept = 22, color = "grey45") +	
+  ggtitle ("Start of Interview")	
+# Plot end of interview	
+ggplot(Main, aes(endtm, as.factor(intnum))) + 	
+  geom_point(aes(colour = Main$unliketm)) + 	
+  labs(y = "Interviewers",	
+               y = "Interviewers",	
+               color = "Group") +	
+  scale_colour_manual(values = c("unlikely" = ESSColors[1],	
+                                         "likely"= "grey")) +	
+  scale_x_continuous(name="Hours of day", limits=c(0, 24), breaks = seq(0,24,1)) + 	
+  scale_y_discrete(breaks = inw_times_end) +	
+  theme(plot.caption = element_text(hjust = 0.5)) +	
+  geom_vline(xintercept = 8, color = "grey45") +	
+  geom_vline(xintercept = 23, color = "grey45") +	
+  ggtitle ("End of Interview")
+
+```
+
+```{r time_annex, error=T}
+
+#Annex file with flags
+write.table(Main[,c("idno", "intnum", "start", "unlikelystart", "end", "unlikelyend")],
+            "Annex/Interview start and end time.csv", sep = ";", row.names = F)
+
+```
+
+The figure shows the distribution of time interviewer started and ended their interviews. For more details, see table in the annex folder with the time for the start and end of the interviews ("Interview start and end time.csv").
+
+
+### Number of interviews on the same day by a single interviewer {#sec:number_int}
+
+The maximum number of interviews in a single day by a single interviewer is an indicator of peak performance by an interviewer. Interviewers should organize and schedule their contact attempts and appointments in such a way that allows them to work as efficiently as possible. However, in some cases, this peak performance indicator can be related to non-compliance with contacting, selection or interviewing protocols. Therefore, national teams are recommended to closely monitor the work of interviewers with an extremely high number of completed interviews within a single day. 
+
+```{r number_int, error=T}
+#Get date from datetime
+Main$date <- as.Date(Main$fulldate, format = "%Y-%m-%d")
+# n>3 interviews on the same day, indicator: ninw_day
+Ninw_day <- Main %>% 
+  group_by(intnum, date) %>% 
+  dplyr::count(.) %>%
+  filter(n>3)
+# vector of all interviewers with >3 interviews per day
+ninw_day <- dplyr::pull(Ninw_day, intnum)
+# vector with duplicates in ninw_day
+ninw_day_dup <- ninw_day[duplicated(ninw_day)]
+```
+
+For more details, see table in the annex folder with the maximum number of interviews per day achieved by each interviewer ("Maximum interview per day.csv"). As mentioned before it is entirely possible to conduct this many interviewers on a single day. Please adjust this threshold of three interviews if is appropriate for your country. These adjustments should be discussed with the CST. If the threshold was reached for more than one case, we would recommend back-checking these interviewers if, in conjunction with the time interval indicator (see \secref{sec:interval}), the combination becomes improbable.
+
+
+```{r number_int_annex, error=T}
+
+Number_int <- Main %>% 
+  group_by(intnum, date) %>% 
+  dplyr::count(.) %>%
+  dplyr::rename(number_int = n)
+
+write.table(Number_int, 
+            "Annex/Maximum interview per day.csv", sep = ";", row.names = F)
+
+```
+
+
+### Time interval between consecutive interviews by a single interviewer {#sec:interval}
+
+The time between consecutive interviews by a single interviewer could also be an indicator of non-compliance with contacting and selection protocol or poor interviewer behaviour. Similar to the number of interviews of on the same day, interviewer should organize and schedule their contact attempts and appointments in such a way that allows them to optimize the (travel)time between interviews. However, extremely short time intervals could also indicate issues affected by undesirable interviewer behaviour, especially if these occur multiple times within the workload of a single interviewer. 
+
+To this end, the analyses would show the minutes between the end of an interview and the start of the following interview within each interviewer. In many cases, the resulting number of minutes is very large, e.g., because the following interview took place another day. Whenever multiple interviews took place on the same day, it is more relevant to check the interval between two interviews.
+
+```{r interval, error=T}
+# time (in minutes) between 2 interviews within interviewers (start[t] - end[t-1])
+dftime <- dplyr::arrange(Main, intnum, start) # dataframe needs to be sorted by intnum and start for next stage to work
+dftime <- dftime %>%
+            group_by(intnum) %>%
+            mutate(diff = start - lag(end),
+                    timebtwints = as.numeric(diff, units = 'mins'))
+dftime <- dplyr::select(dftime, "intnum", "idno", "cntry", "start", "end", "timebtwints")
+dftime <- dftime %>% mutate(timebtwints_critical = if_else(timebtwints <= 30, T, F)) # mark all cases with a critical time between interviews of less than 30 minutes
+timebtwints_critical <- filter(dftime, timebtwints_critical==T)
+dftime_critical <- unique(timebtwints_critical[['intnum']])
+
+dftime_120 <- filter(dftime, timebtwints>=0 & timebtwints <= 120)
+```
+
+Figure \ref{fig:plot_interval} lists interviewers with interviews for which the previous interview was conducted 120 minutes ago or less. Shorter and potentially critical intervals of less than 30 minutes are highlighted in orange to allow an easy check of patterns and clusters. As for most timestamp indicators, this figure can be a good starting point to check the underlying reasons with the survey agency and highlighted interviewers. For more details, see table in the annex folder with the time interval between interviews of the same interviewer ("Time interval between interviews.csv"). 
+
+```{r interval_annex, error=T}
+
+write.table(dftime[,c("idno", "intnum", "start", "end", "timebtwints")], 
+            "Annex/Time interval between interviews.csv", sep = ";", row.names = F)
+
+```
+
+
+```{r interval_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:plot_interval} Time interval between consecutive interviews by interviewer",  linebreak, "Note: For a better overview, only intervals <= 120 minutes were considered in the graph. Interviewer with at least one interval < 30 minutes are labelled."), fig.scap="Time interval between consecutive interviews by interviewer", error=T}
+
+ggplot(dftime_120, aes(timebtwints, as.factor(intnum))) +
+          geom_point(aes(colour = dftime_120$timebtwints_critical)) + 
+          labs(x = "Time between interviews (minutes)",
+               y = "Interviewers",
+               color = "interval <30 minutes \nbetween consecutive \ninterviews") + 
+          scale_colour_manual(values = c("FALSE" = "grey",
+                                         "TRUE" = ESSColors[2])) +
+          scale_x_continuous(breaks = seq(0, max(Main$intnum), 20)) + 
+          scale_y_discrete(breaks = dftime_critical) +
+          theme(plot.caption = element_text(hjust = 0.5))
+```
+
+
+\newpage
+
+# References
