@@ -22,8 +22,8 @@ bibliography: References.bib
 csl: apa.csl
 link-citations: yes
 params:
-  mainFile: "DATA_R10/Main10CZ.csv"
-  intFile: "DATA_R10/Int10CZ.csv"
+  mainFile: ""
+  intFile: ""
 
 # European Social Survey - European Research Infrastructure (ESS-ERIC)
 # europeansocialsurvey.org
@@ -142,94 +142,11 @@ Mainfull <- Main
 Main <- Main %>% filter(!is.na(intnum))
 ```
 
-# Reader's Guide {-}
+# Interviewers in `r thisCountry`
 
-This report presents the results of the analysis of the interim dataset for `r thisCountry`. It aims to help national teams detecting undesirable interviewer behaviour in a timely manner. The report has been standardised for implementation in all participating countries as remote analysis of the interim dataset without the intervention of the international ESS team and without having to move securely stored data from the national level. The report focuses on indicators expected to signal issues with undesirable interviewer behaviour but it can also help detect other issues regarding data collection which are not related to interviewer behaviour. The reader's guide explains how to best utilize the report and take the appropriate steps for data colleciton. It is highly encourage to keep close communication with the CST via the Country Contact for discussion of results and consultation regarding any important decision. Please share the report with your Country Contact. Finally, this report should also be stored and deposited for documentation purposes along with the data and other respective documents to the ESS Archive after fieldwork has been completed. 
+The data provided to the tool contained a total of `r length(Mainfull$idno)` interviews, of which `r length(Main$idno)` contained a valid interviewer number. It is assumed that all interviews have been conducted by an interviewer. Only cases with a valid interviewer number are analyzed in this report.
 
-## Theorical background on interviewer behaviour
-
-Interviewers can have a systematic and substantial impact on the resulting data. Sometimes, their impact is beyond their control, for example, respondents might answer questions somewhat differently when interviewed by a male interviewer compared to when interviewed by a female interviewers. Other times, their impact is well within their control and it is a direct consequence of their behaviour. When analyzing the interim datasets, we want to focus on interviewer-controlled issues, which can be corrected for during the fieldwork if necessary.
-
-_Types of undesirable interviewer behaviour_
-
-When we think of undesirable interviewer behaviour (UIB), what is it we think about? How do we conceptualize this? It can be viewed as behaviour which is unwanted and affects data quality. In this context it is important to point out that this should not be substituted by fabrication of data by interviewers alone, but that fabrication (curb stoning) is just one type of undesirable interviewer behaviour. Furthermore, it should also not be viewed to the prism of interviewer effects alone which are understood as the impact interviewers have on the data they produce. This is because interviewer effects are not necessarily the result of their behaviour alone nor is it necessarily avoidable or under the control of the interviewer.
-
-Secondly, it is important to realise that undesirable interviewer behaviour (or interviewer non-adherence to the standards or procedures) can affect both the representation and the measurement dimension of the total survey error framework. For example, by deviating from the contacting protocol, by selecting the wrong person, by not fully reading out questions, etc.  It is therefore necessary to understand the different ways an interviewer can affect the data quality. 
-Thirdly, non-adherence by interviewers is multi-faceted and context matters. Non-adherence can at the same time be intentional or unintentional, avoidable or unavoidable as well as justifiable or not justifiable. For example, speeding – rushing through the interview – is undesirable interviewer behaviour that is intentional and should be avoided, but is it always unjustified? There are certain circumstances where one could see or understand why an interviewer would show that behaviour. For example, to avoid a break-off of the interview. Another example of non-adherence relates to interviewing the wrong person. This is avoidable, not justifiable but it can be an unintentional error. Other aspects may also be partly out of the control of the interviewer (unavoidable) such as the manner in which respondents adapt their answers or willingness to participate because of the gender, race, perceived attractiveness, etc. of the interviewer.
-
-This multi-faceted, multi-dimensional conceptualization helps to differentiate between those types of behaviour that can be viewed as desirable or undesirable, justifiable or not, and whether or not it can be avoided. However, to move from conceptualization to subsequently be able to determine if UIB occurred, intervene during the data collection stage, and determine which of the underlying causes (intentional or unintentional, avoidable or unavoidable) brought about this observed UIB requires timely data and multiple indicators. Furthermore, this conceptualizations should make clear that there is not one single indicator or infallible measure to determine UIB. UIB can manifest itself in varying ways and to varying degrees. Moreover, it is also not constant within an interviewer or across interviewers. Therefore, an approach is necessary that looks at this from a holistic point of view, understanding which underlying factors can impact the occurrence, intensity and likelihood of different types of UIB. 
-
-Another important part of this conceptual approach focuses on the idea that particular factors work differently in the way they contribute to the likelihood of occurrence of UIB. To this end a distinction is made between _enabling_ factors, _facilitating_ factors and factors that _accentuate_ UIB and its consequences. _Enabling_ factors contribute by allowing undesirable behavior to come to existence. For example, certain design choices such as the use of address or household sampling frames that afford more responsibility to the interviewer in the selection process, or the choice to make use of filter questions (i.e., a question that when answered a certain way results in skipping large parts of the questionnaire) can enable UIB. On the other hand, social and psychological factors, like the working conditions, (the lack of) supervision or the lack of post data collection checks can _facilitate_ UIB. Finally factors that _accentuate_ or contribute to promoting undesirable interviewer behavior are those that drive or push the actions in a particular direction. For example, the type or level of payment motivates interviewers to deviate (or not) from the rules and procedures to a different degree. 
-
-Understanding the type of interviewer-controlled issues is important for deciding the course of action. For example, an interviewer who mistakenly missed parts of the questionnaire might require better training or briefing on the ESS questionnaire, while an interviewer who skipped parts of the questionnaire to save time might need to be excluded from the fieldwork activities. Data analysis can provide clues about the type of issues and help focus the monitoring efforts. However, further investigation is most likely necessary to assert the type of behaviour that caused the issues. 
-
-## Purpose of standardised interim dataset analysis
-
-_Prevention, detection, and documentation_
-
-One of the key steps for successful promotion of desirable interviewer behaviour is detecting issues in the field as early as possible, which is why we require the analysis of the interim dataset (roughly after one third of the total number of interviews have been achieved). Detection leads to the prevention of further issues and therefore to mitigation of the impact of that specific type of undesirable interviewer behaviour. Even if issues can not be corrected, understanding the causes that lead to issue allows to make better informed decision and document problems for data users. Another reason to act quickly is that the more time it has passed between the detection of a data issues and the fieldwork, the harder it become to fully understand the issue. Finally, it is important to realise that these insights can be used in the planning and training stage for the next round.
-
-_Strategies for detecting interviewer-controlled issues: one of many, but vital_
-
-Data analysis of interim datasets is one out of multiple strategies that can be used to detect interviewer-controlled issues during data collection. Other strategies include observation of interviewer behaviour in the field, interviewer debriefing, or back-checks or recontact sample units, analysis of fieldwork paradata (e.g. contact forms data), or activity tracking mechanism many of which are part of the ESS ‘toolbox’. However, the analysis of the interim dataset from the main questionnaire providaes a vital "piece of the puzzle" when attempting to reconstruct fieldwork activities in the process of data collection and understand as it allows us to directly assess the impact on the collected data. 
-
-_Standardised v country-specific analysis: providing context to increase effectiveness_
-
-Standardised data analysis provides a basis for detection of issues related to interviewer issues across countries in a comparative way. . It also allows international surveys like the ESS to establish a minimum quality benchmark that is applied in all participating countries and serves to improve comparability across countries. However, standardised analysis for all participating countries cannot account for country-specific characteristics that are particular to national or regional context, specific survey design characteristics, cultural background, technical particularities of the tool used for the national teams for data collection o country-specific fieldwork decision. Therefore, we highly recommend to interpret, adapt and conduct further analysis that would address particular concerns expected in each country with the country contact to make the results and subsequent insights as useful as possible. 
-
-## Evaluation of results
-
-_Quality benchmarks (flags)_
-
-The quality benchmarks, also known as flags, function as default threshold for each indicators presented in the report. Their purpose is focusing the attention to possible issues rated to interviewer behaviour. These benchmarks are arbitrary and they has been defined based on experience of fieldwork activities across participant countries. The thresholds are by no means fixed and they can be revised to meet country-specific needs and fieldwork characteristics.  
-
-For the interim dataset, quality benchmarks have been defined with a low sensitivity, meaning that is expected that higher number of cases will be flag without an actual problem having occurred (false positives). The flag aim is to raise attention about possible issues for further investigation, instead of reporting the existence of an issue _per se_. 
-
-_Figures, tables and detailed tables in Annex folder_
-
-Results are presented in figures and table to provide a quick overview of the issues. Problematic cases or interviewers are usually highlighted using some form of decision making rules/benchmark. To allow for a more detailed inspection of results, the reader can refer to the csv file stored in the "Annex" folder alongside the pdf report. 
-
-_Adjustment of quality benchmarks_
-
-Adjustment of the quality benchmarks might be necessary to better tune to sensibility to country-specific context or to conduct a more focused investigation of issues. There are two ways to adjust the quality benchmarks used as default for this report: (1) manipulate the csv files stored in the "Annex" folder along the report with the indicators for the desired value, or (2) modifying the R-Markdown syntax provided in the tool under the "tool_file" folder ("Analysis_InterimD_R11-sav.Rmd").  
-
-## Further Investigation of Flags
-
-When cases or interviewers are flagged as a result of exceeding the set thresholds or benchmarks in one or more of the indicators, we recommend further consideration and investigation with the goal of gaining understanding about the causes of the issues. Based on the type of flags and the related level of concern there are different steps and efforts that can or should be considered. In our opinion, these  steps are sequential and escalatory as following:
-
-_Step 1: Providing contextualization_
-
-National teams and survey agencies have access to important information about fieldwork activities, which this report does not account for. For example, prior issues with specific interviewers or details about specific geographical area of sample units can substantially influence the levels of concern raised by flags. Therefore, the first step for the national teams should be to contextualize the reported flags with information available about fieldwork, including the characteristics of the interviewers, the sample units, the details of the CAPI-system, recent fieldwork activities, etc. The information required for contextualization will depend on the respective quality benchmarks and possible explanation for their occurrence. For example, the expected travel distance between two sample units can provide crucial information when asserting the feasibility of very short interval of time between two interviews from the same interviewer.
-
-_Step 2: Debriefing of interviewers_
-
-An important step in clarifying the issues is to query interviewer about possible explanation of the issues observed. Interviewers are one of the most important source of information for explaining issues observed in the data as they were present in the production of the data. They can help reconstruct the fieldwork activities that lead to the issues observed. They should also be seen as partners in solving the issue as their future behaviour might help avoid problem. We recommend that this interaction takes place in a constructive and respectful manner as it. We recommend to document the debriefing results in a short minute that could help later in the assessment, especially if back-checks are conducted.
-
-_Step 3: Additional back-checks_
-
-Going back to the sample units with the the purpose of conducting quality control can provide the necessary information to clarify issues that would otherwise be left unresolved. Please follow the ESS guidance on conducting the back-checks (and also note that the ESS requires back-checks as part of the standard quality control procedures). However, the back-checks we mean here are additional. Please note that when conducting back-checks with the aim of clarifying specific interviewer-related issues, you might need to ask the sample units about specific information that clarifies the issues. For example, if there are concern about parts of the questionnaire not having been asked, you might need to ask the respondent whether they recall being asked about those specific topics and present one or more of the questions to help them recall.
-
-## Implications of Following up on Issues
-
-_Course of action, discussion and documentation_
-
-Once an understanding of the issues has been establish, it is time to decide and discuss the course of action. The course of action should always be decided on the case-by-case approach, considering all available information and with the discussion with the respective stakeholders.  Some example of course of action might involve management of the interviewers, like for example re-briefing, re-training, supervised interviewing exercises, or removal of interviewers from field activities. Management of the interviewers are under the responsibility of the national team and survey agency, however, consultation with the CST is encouraged. Other solutions might require an adjustment of the survey design or manipulation of the data, like recontacting sample units, correction of erroneous data, removal of data (partial or complete), redrawing the sample. Please note that any course of action that involved the modification of the fieldwork plans, contact strategy, manipulation of data, or sampling design are not to be taken lightly and need to be consulted with the Core Scientific Team before any action is taken.
-
-In some cases, the course of action might just be the documentation of the issues, their probable cause, and the step taken to clarify the issues. This allows the ESS to provide explanation to data users about possible issues they might spot when making use of the data. It is recommended to document any course of action taken as a results of quality control and flags raised by this report.
-
-
-
-# Results for `r thisCountry`
-
-
-
-Before, inspecting the inspecting indicators is important to gain an overview of the cases included in the analysis and the number of completed interviews per interviewer. 
-
-First, we check that all cases contain a valid interviewer number. It is a requirement that interviews have a valid interviewer number assigned to them to conduct the analysis of data at an interviewer level. Interviews missing a valid interviewer identification number (intnum) will be excluded from the analysis. The data provided to the tool contained a total of `r length(Mainfull$idno)` cases and a total of `r length(Main$idno)` contained a valid interviewer number. 
-
-This introductory section present also present a brief overview of the completed interviews per interviewer. Figure \ref{fig:nperm_plot} shows the distribution of interview per interviewer and table \ref{tab:table_nperm} descriptive summary statistics of the completed interview per interviewer. The higher number the number of completed interview provides, the more reliable the indicators presented in the following sections are in convening information about interviewer behavior (instead of simply being the result of chance). Also interviewers with higher number of completed interviews should receive more attention as their overall impact of any potential undesirable interviewer behavior will be larger. 
-
-The next sections present indicators on interviewer-level analysis. The second section presents the results on the analysis of the timestamps from the interview. The third section focuses on item non-response. The fourth section investigates response patterns of respondents and how these related to allocations within interviewers.
+A total of `r length(unique(Mainfull$intnum))` interviewers have at least one completed interview. Before interpreting the quality indicators in this report, it is important to bear in mind the number of interviews each interviewer has completed.  Table \ref{tab:table_nperm} provides a descriptive summary of the interviews per interviewer while figure \ref{fig:nperm_plot} visualizes its distribution. The distribution of cases provide a rough picture of the fieldwork activities and an indication of the robustness of the results in this report. 
 
 
 ```{r nperm, results = "asis", error=T}
@@ -240,12 +157,12 @@ tab_niwer <- Main %>%
 #Summary table
 sumtab_niwer <- data.frame(as.list(mysummary(tab_niwer$n)))
 kable(sumtab_niwer,
-      caption = paste("\\label{tab:table_nperm} Descriptive summary of interviews per interviewer"))  %>%
+      caption = paste("\\label{tab:table_nperm} Descriptive summary of interviews per interviwer"))  %>%
   kable_styling(latex_options = c("hold_position"))
 
 ```
 
-```{r nperm_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:nperm_plot} Distribution of interviews per interviewer",  linebreak, "Note: The vertical blue line represents the median number of completed interviews"), fig.scap="Distribution of interviews per interviewer", error=T}
+```{r nperm_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:nperm_plot} Distribution of interview per interviewer",  linebreak, "Note: The vertical blue line represents the median number of completed interviews"), fig.scap="Distribution of interviews per interviewer", error=T}
 
 #Overview of interviews per interviewer
 ggplot(tab_niwer, aes(n, as.factor(intnum))) + 
@@ -273,8 +190,6 @@ ggplot(tab_niwer, aes(n, as.factor(intnum))) +
   geom_vline(xintercept = sumtab_niwer$Q2, color = wes_palette(n=1, name = "Zissou1"), size = 0.3)
 
 ```
-
-
 
 
 # Interview timestamps {#sec:timestamps}

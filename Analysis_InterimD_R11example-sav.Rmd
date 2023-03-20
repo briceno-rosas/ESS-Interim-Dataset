@@ -135,6 +135,21 @@ Main <- dplyr::left_join(Main, Inwer_ID, by = "idno")
 
 ```
 
+```{r dummydataset, error=T}
+#Notes and solutions for dummy Dataset
+
+#Dummy dataset has multiple countries
+table(Main$cntry, useNA = "always")
+#Solution: single country for Dummy dataset
+Main$cntry <- "NL"
+
+#Intnum for all cases
+table(Main$intnum, useNA = "always")
+#Solution: Assigned random intnum 1-5
+Main$intnum <- floor(runif(53, min=1, max=11))
+
+```
+
 ```{r countrynames_rounds, error=T}
 # this Country
 Countrynames <- (read.csv2("Country names and codes.csv", dec = ".", stringsAsFactors = F))
