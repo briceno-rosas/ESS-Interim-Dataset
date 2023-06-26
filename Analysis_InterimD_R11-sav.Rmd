@@ -442,11 +442,11 @@ Equation \ref{eq:speed} indicates the number of items answered per minute. Inter
 ```{r speed_H, error=T}
 
 # Module H without improbable interview durations
-Main_H <- dplyr::select(df_duration,c(idno, intnum, end_g, end_h, ipcrtiva:impfuna))
+Main_H <- dplyr::select(df_duration,c(idno, intnum, end_f, end_h, ipcrtiva:impfuna))
 # number of applicable items q_H
-Main_H <- Main_H %>% mutate(q_H = rowSums(!is.na(select(., -c(intnum, idno, end_g, end_h)))))
+Main_H <- Main_H %>% mutate(q_H = rowSums(!is.na(select(., -c(intnum, idno, end_f, end_h)))))
 # time needed to complete module t_H
-Main_H <- Main_H %>% mutate(t_H = as.numeric(end_h - end_g)/60) %>%
+Main_H <- Main_H %>% mutate(t_H = as.numeric(end_h - end_f)/60) %>%
   filter(t_H != 0)
 # speed over a the module v_H
 Main_H <- Main_H %>% mutate(v_H = q_H/t_H)
@@ -859,10 +859,10 @@ For an overview, we, firstly, check the percentages of nonresponse on the items 
 ```{r nr_moduleH, error=T}
 
 # Selection of variables module Human Values
-  hvc <- c("ipcrtiv", "imprich", "ipeqopt", "ipshabt", "impsafe", "impdiff", 
-           "ipfrule", "ipudrst", "ipmodst", "ipgdtim", "impfree", "iphlppl",
-           "ipsuces", "ipstrgv", "ipadvnt", "ipbhprp", "iprspot", "iplylfr",
-            "impenv", "imptrad", "impfun"
+  hvc <- c("ipcrtiva", "impricha", "ipeqopta", "ipshabta", "impsafea", "impdiffa", 
+           "ipfrulea", "ipudrsta", "ipmodsta", "ipgdtima", "impfreea", "iphlppla",
+           "ipsucesa", "ipstrgva", "ipadvnta", "ipbhprpa", "iprspota", "iplylfra",
+            "impenva", "imptrada", "impfuna"
            )
 
 # create matrix to store percentage nonresponse per question
@@ -1065,9 +1065,9 @@ try(for (i in 1:max(Nchar)) {
 }, silent = T)
 
 # special case Modul H
-Modul_H <- select(Main, ipcrtiv:impfun)
+Modul_H <- select(Main, ipcrtiva:impfuna)
 Main_misH <- Main %>%
-  select(c(idno, intnum, ipcrtiv:impfun)) %>%
+  select(c(idno, intnum, ipcrtiva:impfuna)) %>%
   replace_with_na_at(.vars = names(Modul_H),
                      condition = ~.x %in% c(7, 8, 9))
 
@@ -1123,19 +1123,19 @@ In our analysis approach, we measure non-differentiation by calculating the Mull
 ```{r nondiff, error=T}
 # Modul H
 # define 7 (Refusal), 8 (Don't know), and 9 (No answer) as Na
-Modul_H <- select(Main, ipcrtiv:impfun)
+Modul_H <- select(Main, ipcrtiva:impfuna)
 Main_nondiffH <- Main %>%
-  select(c(idno, intnum, ipcrtiv:impfun)) %>%
+  select(c(idno, intnum, ipcrtiva:impfuna)) %>%
   replace_with_na_at(.vars = names(Modul_H),
                      condition = ~.x %in% c(7, 8, 9))
 # normalization (x-min(x))/(max(x)-min(x)); min(x)=1; max(x)=6
 Main_nondiffH <- mutate(Main_nondiffH,
-                        h1 = ((ipcrtiv-1)/(6-1)), h2 = ((imprich-1)/(6-1)), h3 = ((ipeqopt-1)/(6-1)), h4 = ((ipshabt-1)/(6-1)),
-                        h5 = ((impsafe-1)/(6-1)), h6 = ((impdiff-1)/(6-1)), h7 = ((ipfrule-1)/(6-1)), h8 = ((ipudrst-1)/(6-1)),
-                        h9 = ((ipmodst-1)/(6-1)), h10 = ((ipgdtim-1)/(6-1)), h11 = ((impfree-1)/(6-1)), h12 = ((iphlppl-1)/(6-1)),
-                        h13 = ((ipsuces-1)/(6-1)), h14 = ((ipstrgv-1)/(6-1)), h15 = ((ipadvnt-1)/(6-1)), h16 = ((ipbhprp-1)/(6-1)),
-                        h17 = ((iprspot-1)/(6-1)), h18 = ((iplylfr-1)/(6-1)), h19 = ((impenv-1)/(6-1)), h20 = ((imptrad-1)/(6-1)),
-                        h21 = ((impfun-1)/(6-1)))
+                        h1 = ((ipcrtiva-1)/(6-1)), h2 = ((impricha-1)/(6-1)), h3 = ((ipeqopta-1)/(6-1)), h4 = ((ipshabt-1)/(6-1)),
+                        h5 = ((impsafea-1)/(6-1)), h6 = ((impdiffa-1)/(6-1)), h7 = ((ipfrulea-1)/(6-1)), h8 = ((ipudrst-1)/(6-1)),
+                        h9 = ((ipmodsta-1)/(6-1)), h10 = ((ipgdtima-1)/(6-1)), h11 = ((impfreea-1)/(6-1)), h12 = ((iphlppl-1)/(6-1)),
+                        h13 = ((ipsucesa-1)/(6-1)), h14 = ((ipstrgva-1)/(6-1)), h15 = ((ipadvnta-1)/(6-1)), h16 = ((ipbhprp-1)/(6-1)),
+                        h17 = ((iprspota-1)/(6-1)), h18 = ((iplylfra-1)/(6-1)), h19 = ((impenva-1)/(6-1)), h20 = ((imptrad-1)/(6-1)),
+                        h21 = ((impfuna-1)/(6-1)))
 # straighliners defined as MRP (mean root of pairs)
 Main_nondiffH <- mutate(Main_nondiffH,
                         h_mrp= ((sqrt(abs(h1-h2)) + sqrt(abs(h1-h3)) + sqrt(abs(h1-h4)) + sqrt(abs(h1-h5)) + sqrt(abs(h1-h6)) +
