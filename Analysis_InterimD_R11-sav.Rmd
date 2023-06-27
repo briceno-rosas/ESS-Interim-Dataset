@@ -922,10 +922,10 @@ For an overview, we, firstly, check the percentages of nonresponse on the items 
   # summary(apply(check, 1, function(x) length(unique(x)) == 1)) # if 0 FALSE, we are good to go!
 
 # Descriptives for proportion missings per interviewer - per variable  
-  prop.total <- select(hvs.mis, ipcrtiv._nr.int, ends_with("_prop.tot"))
+  prop.total <- select(hvs.mis, ipcrtiva._nr.int, ends_with("_prop.tot"))
   prop.total <- prop.total %>%
     tibble::rownames_to_column(., var = "intnum") %>%
-    dplyr::rename(num.int = ipcrtiv._nr.int)
+    dplyr::rename(num.int = ipcrtiva._nr.int)
   
 # calculate the mean/variance/median proportion of missings for every interviewer and assign it
 # This is the average (or median/variance) calculated over all the HVS variables
@@ -1130,11 +1130,11 @@ Main_nondiffH <- Main %>%
                      condition = ~.x %in% c(7, 8, 9))
 # normalization (x-min(x))/(max(x)-min(x)); min(x)=1; max(x)=6
 Main_nondiffH <- mutate(Main_nondiffH,
-                        h1 = ((ipcrtiva-1)/(6-1)), h2 = ((impricha-1)/(6-1)), h3 = ((ipeqopta-1)/(6-1)), h4 = ((ipshabt-1)/(6-1)),
-                        h5 = ((impsafea-1)/(6-1)), h6 = ((impdiffa-1)/(6-1)), h7 = ((ipfrulea-1)/(6-1)), h8 = ((ipudrst-1)/(6-1)),
-                        h9 = ((ipmodsta-1)/(6-1)), h10 = ((ipgdtima-1)/(6-1)), h11 = ((impfreea-1)/(6-1)), h12 = ((iphlppl-1)/(6-1)),
-                        h13 = ((ipsucesa-1)/(6-1)), h14 = ((ipstrgva-1)/(6-1)), h15 = ((ipadvnta-1)/(6-1)), h16 = ((ipbhprp-1)/(6-1)),
-                        h17 = ((iprspota-1)/(6-1)), h18 = ((iplylfra-1)/(6-1)), h19 = ((impenva-1)/(6-1)), h20 = ((imptrad-1)/(6-1)),
+                        h1 = ((ipcrtiva-1)/(6-1)), h2 = ((impricha-1)/(6-1)), h3 = ((ipeqopta-1)/(6-1)), h4 = ((ipshabta-1)/(6-1)),
+                        h5 = ((impsafea-1)/(6-1)), h6 = ((impdiffa-1)/(6-1)), h7 = ((ipfrulea-1)/(6-1)), h8 = ((ipudrsta-1)/(6-1)),
+                        h9 = ((ipmodsta-1)/(6-1)), h10 = ((ipgdtima-1)/(6-1)), h11 = ((impfreea-1)/(6-1)), h12 = ((iphlppla-1)/(6-1)),
+                        h13 = ((ipsucesa-1)/(6-1)), h14 = ((ipstrgva-1)/(6-1)), h15 = ((ipadvnta-1)/(6-1)), h16 = ((ipbhprpa-1)/(6-1)),
+                        h17 = ((iprspota-1)/(6-1)), h18 = ((iplylfra-1)/(6-1)), h19 = ((impenva-1)/(6-1)), h20 = ((imptrada-1)/(6-1)),
                         h21 = ((impfuna-1)/(6-1)))
 # straighliners defined as MRP (mean root of pairs)
 Main_nondiffH <- mutate(Main_nondiffH,
