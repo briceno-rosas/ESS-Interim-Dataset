@@ -54,7 +54,7 @@ library(psych)
 library(ggplot2)
 library(lubridate)
 library(wesanderson)
-library(colortools) # adjacent works
+#library(colortools) # adjacent works #removed
 library(ggthemes) # theme_tufte works
 library(varhandle) # coercing factor to numeric variables
 library(naniar) # for replacing values with missings
@@ -75,12 +75,12 @@ linebreak <- "\\hspace{\\textwidth}"
 ESSred <- rgb(.91, .20, .32)
 ESSgreen <- rgb(.14, .62, .51)
 ESSblue <- rgb(0, .25, .48)
-  
-ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+# ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+# ESSColors <- c(ESSColors, ESSgreen, ESSblue)
 
-ESSColors <- c(ESSColors, ESSgreen, ESSblue)
-# pizza(ESSColors)
+ESSColors <- c("#E83352", "#E86F33", "#E833AD", "#ACE833", "#33E8C9", "#6F33E8", "#249E82", "#00407A")
 
+#pizza(ESSColors)
 themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
     theme(axis.title = element_text(size = 9, face = "plain"),
           axis.text = element_text(size = 9),
