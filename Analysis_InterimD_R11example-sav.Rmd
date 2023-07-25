@@ -887,7 +887,7 @@ For an overview, we, firstly, check the percentages of nonresponse on the items 
   colnames(perc.nonr) <- "perc_nonresponse"
   
   for(i in hvc){
-    perc.nonr[i, ] <- sum(Main[[i]]==7|Main[[i]]==8)/nrow(Main)*100 
+    perc.nonr[i, ] <- sum(Main[[i]]==77|Main[[i]]==88|Main[[i]]==99)/nrow(Main)*100 
   }
   
 #   for(i in 1:length(hvc)){
@@ -901,26 +901,33 @@ For an overview, we, firstly, check the percentages of nonresponse on the items 
       dplyr::select(x) %>% 
       table()
       
-  if("7" %in% colnames(tab)==F) {
+  if("77" %in% colnames(tab)==F) {
       tab <- cbind(tab, 0)
-      colnames(tab)[colnames(tab)==""] <- 7
+      colnames(tab)[colnames(tab)==""] <- 77
   } 
     
-  if("8" %in% colnames(tab)==F) { 
+  if("88" %in% colnames(tab)==F) { 
       tab <- cbind(tab, 0)
-      colnames(tab)[colnames(tab)==""] <- 8
+      colnames(tab)[colnames(tab)==""] <- 88
   }
   
-    mis <- tab[,c("7", "8")]
+    if("99" %in% colnames(tab)==F) { 
+      tab <- cbind(tab, 0)
+      colnames(tab)[colnames(tab)==""] <- 99
+  }
+  
+    mis <- tab[,c("77", "88", "99")]
     mis.tot <-  rowSums(mis)
     int <- rowSums(tab)
-    prop.ref <- tab[,c("7")]/int
-    prop.dk <- tab[,c("8")]/int
+    prop.ref <- tab[,c("77")]/int
+    prop.dk <- tab[,c("88")]/int
+    prop.na <- tab[,c("99")]/int
     prop.tot <- mis.tot/int
     assign("tabout", cbind(rownames(mis), int, mis, mis.tot, prop.ref, prop.dk, prop.tot))
-    colnames(tabout) <- c("_id", "_nr.int", "_refused", "_dk", "_tot", "_prop.ref", "_prop.dk", "_prop.tot")
+    colnames(tabout) <- c("_id", "_nr.int", "_refused", "_dk", "_tot", "_prop.ref", "_prop.dk", "prop.na", "_prop.tot")
     return(tabout)
     }
+
 
 
 
