@@ -111,10 +111,10 @@ themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
 
 ```{r getdata, error=T}
 # Interviewer-Questionnaire with Inwer ID (intnum):
-Inwer <- read.csv2(params$intFile, dec=".", stringsAsFactors=F)
+Inwer <- read.csv(params$intFile, dec=".", stringsAsFactors=F)
 
 # Main Dataset
-Main <- read.csv2(params$mainFile, dec=".", stringsAsFactors=F)
+Main <- read.csv(params$mainFile, dec=".", stringsAsFactors=F)
 
 # Inwer<-haven::read_spss(params$intFile)
 # Main<-haven::read_spss(params$mainFile)

@@ -1,5 +1,6 @@
 ---
-output:
+title: "Example Report ESS R11 based on a dummy dataset. Note that the content of the results are based on randomly generated numbers" 
+  output:
   pdf_document:
     includes:
       in_header: styles.tex
