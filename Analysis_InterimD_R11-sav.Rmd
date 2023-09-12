@@ -301,7 +301,6 @@ Main$end_c <- as_datetime(Main$cinwe, origin = "1582-10-14")
 Main$end_d <- as_datetime(Main$dinwe, origin = "1582-10-14")
 Main$end_e <- as_datetime(Main$einwe, origin = "1582-10-14")
 Main$end_f <- as_datetime(Main$finwe, origin = "1582-10-14")
-Main$end_g <- as_datetime(Main$ginwe, origin = "1582-10-14")
 Main$end_h <- as_datetime(Main$hinwe, origin = "1582-10-14")
 Main$end_i <- as_datetime(Main$iinwe, origin = "1582-10-14") 
 
@@ -443,13 +442,13 @@ Equation \ref{eq:speed} indicates the number of items answered per minute. Inter
 ```{r speed_H, error=T}
 
 # Module H without improbable interview durations
-Main_H <- dplyr::select(df_duration,c(idno, intnum, end_g, end_h, ipcrtiva:impfuna))
+Main_H <- dplyr::select(df_duration,c(idno, intnum, end_f, end_h, ipcrtiva:impfuna))
 # number of applicable items q_H
-Main_H <- Main_H %>% mutate(q_H = rowSums(!is.na(select(., -c(intnum, idno, end_g, end_h)))),
-                            q_Hvalid = rowSums(!is.na(select(., -c(intnum, idno, end_g, end_h))) &
-                                                 select(., -c(intnum, idno, end_g, end_h)) < 7))
+Main_H <- Main_H %>% mutate(q_H = rowSums(!is.na(select(., -c(intnum, idno, end_f, end_h)))),
+                            q_Hvalid = rowSums(!is.na(select(., -c(intnum, idno, end_f, end_h))) &
+                                                 select(., -c(intnum, idno, end_f, end_h)) < 7))
 # time needed to complete module t_H
-Main_H <- Main_H %>% mutate(t_H = as.numeric(end_h - end_g)/60) %>%
+Main_H <- Main_H %>% mutate(t_H = as.numeric(end_h - end_f)/60) %>%
   filter(t_H != 0)
 # speed over a the module v_H
 Main_H <- Main_H %>% mutate(v_H = q_H/t_H,
