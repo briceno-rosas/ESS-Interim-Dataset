@@ -14,7 +14,6 @@ header-includes:
   - \setlength{\droptitle}{5em} 
 papersize: a4paper
 fontsize: 11pt
-mainfont: Carlito
 geometry: margin = 3cm
 subparagraph: TRUE
 graphics: yes
@@ -22,8 +21,8 @@ bibliography: References.bib
 csl: apa.csl
 link-citations: yes
 params:
-  mainFile: ""
-  intFile: ""
+  mainFile: "DATA_FMS/cases_BE.csv"
+  intFile: "DATA_FMS/cases_BE.csv"
 
 # European Social Survey - European Research Infrastructure (ESS-ERIC)
 # europeansocialsurvey.org
@@ -127,8 +126,8 @@ linebreak <- "\\hspace{\\textwidth}"
 
 # CF data from Upload Portal with Inwer ID (intnum). Use either params.
   #@May, please change after UI adjustment if necessary
-CF <- read.csv2(params$intFile, sep = ",", dec=".", stringsAsFactors=F)
-CF <- read.csv2(params$mainFile,  sep = ",", dec=".", stringsAsFactors=F)
+CF <- read.csv2(params$intFile, sep = ";", dec=".", stringsAsFactors=F)
+CF <- read.csv2(params$mainFile,  sep = ";", dec=".", stringsAsFactors=F)
 
 
 #Test data - 
@@ -164,7 +163,7 @@ Each section explains the meaning of the indicator and how it is calculated (if 
 It is recommended to view these indicators as complementary to the information coming from the field and as complementary to each other. They help gain further insights into activities in the field. They do not explain the reasons for deviations or extreme values. It is recommended to discuss the results with colleagues and view the indicators in conjunction with other information available on the fieldwork. 
 
 
-# Overview of fieldwork {#sec:fiedlworkoverview}
+# Overview of fieldwork in `r thisCountry` {#sec:fiedlworkoverview}
 
 Before inspecting the work conducted by the interviewers, it is recommended to view the overall state of fieldwork. This allows contextualizing the work of the interviewer in the field. This section provides further indicators on the state of the fieldwork compared to those available on the FMS website.  
 
@@ -176,8 +175,9 @@ CF$resulb <- CF$case_resulb
 CF$outnic <- CF$case_outnic 
 CF$intnum <- CF$iwer_human_identifier
 CF$dateresult <- CF$case_lastoutcome_date
-CF$nattempts <- CF$case_ntimes_visited
-CF$nvisits <- CF$case_ntimes_visited_face
+#CF$nattempts <- CF$case_ntimes_visited #Old R10 / Variable removed from analysis
+#CF$nvisits <- CF$case_ntimes_visited_face #Old R10
+CF$nvisits <- CF$case_ntimes_visited #In R11 visited and contact attempt assumed as one
 CF$lastattempt.modeall <- CF$case_lastoutcome_mode
 
 #Add main indicators
@@ -290,7 +290,7 @@ CF <- CF %>%
                                                   "UND" = "Undefined"))
 
 CF_main <- CF[,c("cntry", "Country", "idno", "intnum", "finalcode", "finalcodeaggregated", 
-                         "dateresult","lastattempt.mode", "nattempts", "nvisits")]
+                         "dateresult","lastattempt.mode", "nvisits")]
 names(CF)
 ```
 
@@ -308,13 +308,15 @@ From the `r length(CF$idno)` cases in the file from `r thisCountry`, a total of 
 
 Table \ref{tab:Outcomebreakdown_tab} shows the distribution of the outcome codes for `r thisCountry` based on the data uploaded to the FMS. These are grouped within their respective classification used for the calculation of the outcome rates in the ESS.
 
+It should be noted that the Round 11 version of the FMS Upload does not differentiated between personal visits and contact attempts without a personal visit.
+
 
 ```{r OutcomeTable, error=T}
 
 names(CF)
 #Outcome variables only
 CF_outcome <- CF_main[,c("cntry", "Country", "idno", "intnum", "finalcode", "finalcodeaggregated", 
-                         "dateresult","lastattempt.mode", "nattempts", "nvisits")]
+                         "dateresult","lastattempt.mode", "nvisits")]
 
 
 # Information on all final codes
@@ -377,17 +379,17 @@ CF_outcome_finalcode_prob <- CF_outcome %>%
 
 # finalcodeaggregated #
 
-CF_outcome_finalcodeaggregated_n <- CF_outcome %>% 
-  dplyr::group_by(cntry) %>% 
+CF_outcome_finalcodeaggregated_n <- CF_outcome %>%
+  dplyr::group_by(cntry) %>%
   dplyr::count(finalcodeaggregated) %>%
   dplyr::rename(Freq=n, Country=cntry, code=finalcodeaggregated) %>%
   dplyr::right_join(allcodesaggregated,CF_outcome,by=c("Country","code")) %>%
   dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
   dplyr::mutate(code=as.character(code)) %>%
-  dplyr::mutate(classification="finalcodeaggregated", type="n") 
+  dplyr::mutate(classification="finalcodeaggregated", type="n")
 
-CF_outcome_finalcodeaggregated_prop <- CF_outcome %>% 
-  dplyr::group_by(cntry) %>% 
+CF_outcome_finalcodeaggregated_prop <- CF_outcome %>%
+  dplyr::group_by(cntry) %>%
   dplyr::count(finalcodeaggregated) %>%
   dplyr::mutate(Freq = prop.table(n)) %>%
   dplyr::select(-n) %>%
@@ -395,21 +397,21 @@ CF_outcome_finalcodeaggregated_prop <- CF_outcome %>%
   dplyr::right_join(allcodesaggregated,CF_outcome,by=c("Country","code")) %>%
   dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
   dplyr::mutate(code=as.character(code)) %>%
-  dplyr::mutate(classification="finalcodeaggregated", type="prop") 
-
-## Combine cases   ###
+  dplyr::mutate(classification="finalcodeaggregated", type="prop")
+# 
+# ## Combine cases   ###
 
 CF_outcome_breakdown <- dplyr::union_all(CF_outcome_finalcode_n, CF_outcome_finalcode_prob) %>%
-  dplyr::union_all(., CF_outcome_finalcodeaggregated_n) %>%
-  dplyr::union_all(., CF_outcome_finalcodeaggregated_prop) %>%
+  # dplyr::union_all(., CF_outcome_finalcodeaggregated_n) %>%
+  # dplyr::union_all(., CF_outcome_finalcodeaggregated_prop) %>%
   arrange(classification,type,code,Country)
 
-# add country names to dataset ##
-CF_outcome_breakdown <- left_join(CF_outcome_breakdown, Country, by = c("Country"="cntry")  , all = TRUE, sort = FALSE)
-CF_outcome_breakdown <- CF_outcome_breakdown %>%
-  ungroup() %>%
-  select(-c(Country, CountryName)) %>%
-  dplyr::rename(Country=Country.y)
+# # add country names to dataset ##
+# CF_outcome_breakdown <- left_join(CF_outcome_breakdown, Country, by = c("Country"="cntry")  , all = TRUE, sort = FALSE)
+# CF_outcome_breakdown <- CF_outcome_breakdown %>%
+#   ungroup() %>%
+#   select(-c(Country, CountryName)) %>%
+#   dplyr::rename(Country=Country.y)
 
 ```
 
@@ -516,7 +518,7 @@ kable(rates,
 
 ## Contacting sample units {#sec:contacting}
 
-Figure \ref{fig:nca_plot} shows how many contacts attempts have been made to the sample units so far. Figure \ref{fig:npv_plot} focused on only on personal visits made to the sample units
+Figure \ref{fig:npv_plot} shows how many visits have been made to the sample units so far. 
 
 ```{r ca, error=T}
 
@@ -526,18 +528,18 @@ ncainfo <- as.numeric(count(!is.na(CF_main$attempts)))
 
 
 ```{r nca_plot, fig.width = 7, fig.cap = paste("\\label{fig:nca_plot} Contact attempts to sample units"), fig.scap="Contact attempts to sample units", error=T}
-
-## Cases plot
-ggplot(CF_main %>% 
-         mutate(nattempts), 
-       aes(x = nattempts, fill = nattempts < 1)) +
-  geom_bar(col = "white") +
-  scale_x_continuous(name = "Number of contact attempts", breaks = seq(0, max(CF_main$nattempts), 1)) +
-  scale_y_continuous(name = "Sample units") +
-  expand_limits(x = c(0, max(CF_main$nattempts))) +
-  scale_fill_manual(values = c("FALSE" =  ESSColors[8], 
-                               "TRUE" = "gray")) +
-  themeESS
+# Removed in R11
+# ## Cases plot
+# ggplot(CF_main %>% 
+#          mutate(nattempts), 
+#        aes(x = nattempts, fill = nattempts < 1)) +
+#   geom_bar(col = "white") +
+#   scale_x_continuous(name = "Number of contact attempts", breaks = seq(0, max(CF_main$nattempts), 1)) +
+#   scale_y_continuous(name = "Sample units") +
+#   expand_limits(x = c(0, max(CF_main$nattempts))) +
+#   scale_fill_manual(values = c("FALSE" =  ESSColors[8], 
+#                                "TRUE" = "gray")) +
+#   themeESS
 
 ```
 
@@ -592,7 +594,7 @@ ggplot(modelastca,aes(x = 1, y = Freq, fill = lastattempt.mode)) +
 
 The ESS Specifications indicate that sample units need to be visited at least four times in person before can be abandoned as ‘non‐productive.’ Personal visits are even more relevant if no contact at all has been achieved with the sample unit yet (the definition of non‐contacts in the ESS algorithm for outcome codes). Investing the necessary effort in contacting sample units is fundamental for achieving the best results in the field.
 
-Figure \ref{fig:pv2nc_plot} shows the number of personal visits conducted to cases currently considered as non‐ contacts. Non‐contacts with less than four individuals are shown in grey. To provide a broader view of the contacting efforts made to non‐contacts so far, figure \ref{fig:ca2nc_plot} shows the distribution of non-contacts based on the number of contact attempts made to them.
+Figure \ref{fig:pv2nc_plot} shows the number of visits conducted to cases currently considered as non‐ contacts. Non‐contacts with less than four individuals are shown in grey.
 
 ```{r ca2nc, error=T}
 nnc <- as.numeric(count(CF$finalcode== 20))
@@ -617,23 +619,23 @@ ggplot(subset(CF_main, finalcode == 20) %>%
 
 
 ```{r ca2nc_plot, fig.width = 7, fig.cap = paste("\\label{fig:ca2nc_plot} Contact attempts to non-contacts",  linebreak, "Note:", "n =", nnc), fig.scap="Contact attempts  to non-contacts", error=T}
-
-## Cases plot
-ggplot(subset(CF_main, finalcode == 20) %>% 
-         mutate(nattempts), 
-       aes(x = nattempts)) +
-  geom_bar(col = "white") +
-  scale_x_continuous(name = "Number of contact attempts", breaks = seq(0, max(CF_main$nattempts), 1)) +
-  scale_y_continuous(name = "Number of non-contacts") +
-  expand_limits(x = c(0, 20)) +
-  themeESS
+#Removed R11 
+# ## Cases plot
+# ggplot(subset(CF_main, finalcode == 20) %>% 
+#          mutate(nattempts), 
+#        aes(x = nattempts)) +
+#   geom_bar(col = "white") +
+#   scale_x_continuous(name = "Number of contact attempts", breaks = seq(0, max(CF_main$nattempts), 1)) +
+#   scale_y_continuous(name = "Number of non-contacts") +
+#   expand_limits(x = c(0, 20)) +
+#   themeESS
 
 
 ```
 
 ## Interviewer workforce {#sec:workforce}
 
-Currently `r length(unique(CF$intnum))` interviewers have sample units assigned to them in the FMS Upload Portal. `r length(unique(CF[CF$nattempts>0,]$intnum))` interviewers carried out at least one contact attempt on any of their assigned cases. 
+Currently `r length(unique(CF$intnum))` interviewers have sample units assigned to them in the FMS Upload Portal. `r length(unique(CF[CF$nvisits>0,]$intnum))` interviewers carried out at least one contact attempt on any of their assigned cases. 
 Due to the limitations of the FMS, it is not possible to know whether there were other interviewers engaged in fieldwork activities outside those currently shown as having assigned cases.
 
 \newpage
@@ -662,20 +664,20 @@ IwerCurrentNonResp <- aggregate(idno ~ cntry + intnum, FUN = function(x) length(
   rename(ncurrentnonresp = idno)
 
 # N noncontacts with less than 4 contact attempts
-
-CF_ncless4ca <- subset(CF_main, 
-                       CF_main$finalcode ==  20 &
-                         CF_main$nattempts < 4)
-a <- CF_ncless4ca %>% dplyr::group_by(intnum) %>%
-         dplyr::count(intnum) %>%
-         dplyr::rename("ncless4ca" = "n")
-b <- CF_main %>% dplyr::group_by(intnum) %>%
-         dplyr::count(intnum) %>%
-         dplyr::transmute(n = 0) %>%
-         dplyr::rename("ncless4ca" = "n") 
-ifelse(nrow(CF_ncless4ca)>0, 
-       IwerNCless4ca <- a, 
-       IwerNCless4ca <- b)
+# REMOVED in R11
+# CF_ncless4ca <- subset(CF_main, 
+#                        CF_main$finalcode ==  20 &
+#                          CF_main$nattempts < 4)
+# a <- CF_ncless4ca %>% dplyr::group_by(intnum) %>%
+#          dplyr::count(intnum) %>%
+#          dplyr::rename("ncless4ca" = "n")
+# b <- CF_main %>% dplyr::group_by(intnum) %>%
+#          dplyr::count(intnum) %>%
+#          dplyr::transmute(n = 0) %>%
+#          dplyr::rename("ncless4ca" = "n") 
+# ifelse(nrow(CF_ncless4ca)>0, 
+#        IwerNCless4ca <- a, 
+#        IwerNCless4ca <- b)
 
 # N noncontacts with less than 4 personal visits
 
@@ -728,7 +730,7 @@ IwerFinalcodeAggr <- IwerFinalcodeAggr %>%
 IwerQI1 <- full_join(IwerCurrentWork, IwerCurrentNonResp)
 IwerQI1 <- full_join(IwerQI1, IwerFinalcodeAggr)
 IwerQI1 <- full_join(IwerQI1, IwerFinalcode)
-IwerQI1 <- full_join(IwerQI1, IwerNCless4ca)
+#IwerQI1 <- full_join(IwerQI1, IwerNCless4ca) #Removed R11
 IwerQI1$ncless4ca <- tidyr::replace_na(IwerQI1$ncless4ca,0)
 IwerQI1 <- full_join(IwerQI1, IwerNCless4pv)
 IwerQI1$ncless4pv <- tidyr::replace_na(IwerQI1$ncless4pv,0)
@@ -989,7 +991,6 @@ if(((IwerQI1_ncrdescr$mean + IwerQI1_ncrdescr$sd*-2)>0)) #Exclude negative value
 As mentioned in section \ref{sec:nnonc}, ESS Specifications indicate that sample units need to be visited at least for times in person before they can be abandoned as ‘non‐productive’. Identifying interviewers with a large number of non‐contacts without at least four personal visits or contact attempts helps detect issues in the workforce, keep oversight on their work and activeness, and allow for reissuing of sample units to other interviewers if necessary. Especially at later stages of the fieldwork, it is essential to evaluate non-contacts carefully to avoid leaving sample units with less effort than the minimum required by the ESS standards. 
 
 Figure \ref{fig:iwerncless4pv_plot} shows the number of non‐contacts with less than four personal visits assigned to each interviewer. 
-Figure \ref{fig:iwerncless4ca_plot} widens the focus of the analysis to any type of contact attempt, showing the number of non‐contacts with less than four contact attempts per interviewer. 
 
 
 ```{r iwerncless4pv_plot, fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerncless4pv_plot} Distribution of non-contacts with less than 4 personal visits per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Distribution of non-contacts with less than 4 personal visits per interviewer", error=T}
@@ -1017,25 +1018,25 @@ ifelse(nrow(CF_ncless4pv)>0, print(a), print(b))
 
 
 ```{r iwerncless4ca_plot, fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerncless4ca_plot} Distribution of non-contacts with less than 4 contact attemtps per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Distribution of non-contacts with less than 4 contact attemtps per interviewer", error=T}
-
-## Cases plot
-a <- ggplot(IwerNCless4ca,
-       aes(ncless4ca, as.factor(intnum))) +
-  labs(x = "Number of non-contacts with less than 4 contact attempts",
-       y = "Interviewers (not shown if x equal 0)") +
-  scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4ca)+1))) +
-  geom_point(color='orangered3')
-
-b <- ggplot(IwerQI1,
-       aes(ncless4ca, as.factor(intnum))) +
-  labs(x = "Number of non-contacts with less than 4 contact attempts",
-       y = "Interviewers") +
-  scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4ca)+1))) +
-  geom_point(color='green4')
-
-## Show only if higher than 0
-##if(nrow(CF_ncless4ca)>0) {print(a)} 
-ifelse(nrow(CF_ncless4ca)>0, print(a), print(b))
+# REMOVED in R11
+# ## Cases plot
+# a <- ggplot(IwerNCless4ca,
+#        aes(ncless4ca, as.factor(intnum))) +
+#   labs(x = "Number of non-contacts with less than 4 contact attempts",
+#        y = "Interviewers (not shown if x equal 0)") +
+#   scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4ca)+1))) +
+#   geom_point(color='orangered3')
+# 
+# b <- ggplot(IwerQI1,
+#        aes(ncless4ca, as.factor(intnum))) +
+#   labs(x = "Number of non-contacts with less than 4 contact attempts",
+#        y = "Interviewers") +
+#   scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4ca)+1))) +
+#   geom_point(color='green4')
+# 
+# ## Show only if higher than 0
+# ##if(nrow(CF_ncless4ca)>0) {print(a)} 
+# ifelse(nrow(CF_ncless4ca)>0, print(a), print(b))
 
 ```
 

@@ -1,0 +1,28 @@
+code;label;aggregated;NTS
+0;Contact forms missing;Undefined;Y
+10;Valid interview;Complete and valid interview;X
+11;Partial interview: break off;Not able and other nonresponse;X
+12;Invalid interview;Not able and other nonresponse;W
+20;Non-contact;No contact;E
+30;Refusal because of opt-out list;Refusal;D
+31;Broken appointment;Not able and other nonresponse;H
+32;Refusal by respondent;Refusal;B
+33;Refusal by proxy;Refusal;C
+34;Household refusal, before selection;Refusal;C
+41;Respondent not available, away;Not able and other nonresponse;H
+42;Respondent mentally/physical unable/ill/sick (short term);Not able and other nonresponse;G
+43;Respondent deceased;Ineligible;N
+44;Language barrier;Not able and other nonresponse;F
+45;Contact but no interview, other;Not able and other nonresponse;H
+46;Respondent mentally/physical unable/ill/sick (long term);Not able and other nonresponse;G
+51;Respondent moved out of country;Ineligible;M
+52;Respondent moved to unknown destination;Not able and other nonresponse;E
+53;Respondent has moved, still in country;Not able and other nonresponse;E
+54;Address not traceable;Not able and other nonresponse;I
+61;Derelict or demolished house;Ineligible;K
+62;Not yet built, not ready for occupation;Ineligible;K
+63;Not occupied;Ineligible;K
+64;Address not residential: business;Ineligible;J
+65;Address not residential: institution;Ineligible;J
+67;Other ineligible;Ineligible;L
+88;Undefined;Undefined;Y
