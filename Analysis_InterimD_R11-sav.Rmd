@@ -445,8 +445,8 @@ Equation \ref{eq:speed} indicates the number of items answered per minute. Inter
 Main_H <- dplyr::select(df_duration,c(idno, intnum, end_f, end_h, ipcrtiva:impfuna))
 # number of applicable items q_H
 Main_H <- Main_H %>% mutate(q_H = rowSums(!is.na(select(., -c(intnum, idno, end_f, end_h)))),
-                            q_Hvalid = rowSums(!is.na(select(., -c(intnum, idno, end_g, end_h))) &
-                                                 select(., -c(intnum, idno, end_g, end_h)) < 7))
+                            q_Hvalid = rowSums(!is.na(select(., -c(intnum, idno, end_f, end_h))) &
+                                                 select(., -c(intnum, idno, end_f, end_h)) < 7))
 # time needed to complete module t_H
 Main_H <- Main_H %>% mutate(t_H = as.numeric(end_h - end_f)/60) %>%
   filter(t_H != 0)
