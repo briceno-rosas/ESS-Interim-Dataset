@@ -21,8 +21,8 @@ bibliography: References.bib
 csl: apa.csl
 link-citations: yes
 params:
-  mainFile: "DATA_FMS/cases_BE.csv"
-  intFile: "DATA_FMS/cases_BE.csv"
+  mainFile: ""
+  intFile: ""
 
 # European Social Survey - European Research Infrastructure (ESS-ERIC)
 # europeansocialsurvey.org
