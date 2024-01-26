@@ -1254,12 +1254,12 @@ Mulligan <- bind_rows(Mulligan_H_all, Mulligan_H_4)
 
 ```
 
-Figure \ref{fig:plot_nondiff} shows the average Mulligan Score for each interview and interviewers with at least four interviews for module H. We made this differentiation, because the probability that outliers are incidental findings is lower for interviewers with at least four interviews. Interviewers that are defined as outliers are labelled in the figure. For more details, see table in the annex folder with the average Mulligan Score for non-differentiation in module H per interviewer ("Non-differentiation in module H per interviewer.csv").
+Figure \ref{fig:plot_nondiff} shows the average Mulligan Score for each interview and interviewers with at least four interviews for module H. We made this differentiation, because the probability that outliers are incidental findings is lower for interviewers with at least four interviews. Interviewers that are defined as outliers are labelled in the figure. For more details, see table in the annex folder with the average Mulligan Score for non-differentiation in module H per interviewer ("Non differentiation in module H per interviewer.csv").
 
 ```{r nondiff_annex, error=T}
 
 write.table(Mulligan_H_all[,c("intnum", "avg")] %>% dplyr::rename(avg_mulligan = avg),
-            "Annex/Match rates for near duplicates.csv", sep = ";", row.names = F)
+            "Annex/Non differentiation in module H per interviewer.csv", sep = ";", row.names = F)
 
 ```
 
