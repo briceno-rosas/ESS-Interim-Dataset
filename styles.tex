@@ -18,12 +18,12 @@
 
 \counterwithin{figure}{section}
 \counterwithin{table}{section}
-\definecolor{ESSPink}{rgb}{0.91,0.2,0.32}
+\definecolor{ESSRed}{HTML}{ef3e42}
 
 
 \titleformat
 	{\section}
-	{\bf \LARGE \sc \color{ESSPink}}
+	{\bf \LARGE \sc \color{ESSRed}}
 	{\rlap{\thesection}\hspace{1cm}}
         {0pt}
         {}
@@ -38,8 +38,8 @@
 
 \newcommand*{\secref}[1]{Section~\ref{#1}}
 
-\captionsetup[figure]{labelfont= {color = ESSPink, bf}, labelsep = space}
-\captionsetup[table]{labelfont= {color = ESSPink, bf}, labelsep = space}
+\captionsetup[figure]{labelfont= {color = ESSRed, bf}, labelsep = space}
+\captionsetup[table]{labelfont= {color = ESSRed, bf}, labelsep = space}
 
 \let\stdsection\section
 \renewcommand{\section}{\FloatBarrier\clearpage\FloatBarrier\stdsection}

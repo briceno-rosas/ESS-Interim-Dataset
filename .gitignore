@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+Annex/
+*_files/
+*.log
+Analysis*.pdf
+Analysis*.tex
