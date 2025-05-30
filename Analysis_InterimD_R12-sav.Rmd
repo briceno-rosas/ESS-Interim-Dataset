@@ -22,8 +22,8 @@ bibliography: References.bib
 csl: apa.csl
 link-citations: yes
 params:
-  mainFile: "DATA_R11/ESS11_DATA_MAIN_QUESTIONNAIRE_TIMESTAMPS_TEST.sav"
-  intFile: "DATA_R11/ESS11_DATA_INTERVIEWER_QUESTIONNAIRE_TEST.sav"
+  mainFile: "DATA_R12/data_simulated.sav"
+  intFile: "DATA_R12/intnums_simulated.sav"
 
 # European Social Survey - European Research Infrastructure (ESS-ERIC)
 # europeansocialsurvey.org
@@ -138,8 +138,8 @@ thisCountry <- unique(Country$CountryName)
 ```
 
 ```{r missingintnum, error=T}
-# Allcases in Main
-Mainfull <- Main
+# All face-to-face cases in Main
+Mainf2f <- Main %>% filter(mode %in% c(1, 2))
 
 # Filter out cases without intnum
 Main <- Main %>% filter(!is.na(intnum))
@@ -226,9 +226,9 @@ In some cases, the course of action might just be the documentation of the issue
 
 # Interviewers in `r thisCountry`
 
-The data provided to the tool contained a total of `r length(Mainfull$idno)` interviews, of which `r length(Main$idno)` contained a valid interviewer number. It is assumed that all interviews have been conducted by an interviewer. Only cases with a valid interviewer number are analyzed in this report.
+The data provided to the tool contained a total of `r length(Mainf2f$idno)` face-to-face or video interviews, of which `r length(Main$idno)` contained a valid interviewer number. It is assumed that all interviews have been conducted by an interviewer. Only cases with a valid interviewer number are analyzed in this report.
 
-A total of `r length(unique(Mainfull$intnum))` interviewers have at least one completed interview. Before interpreting the quality indicators in this report, it is important to bear in mind the number of interviews each interviewer has completed.  Table \ref{tab:table_nperm} provides a descriptive summary of the interviews per interviewer while figure \ref{fig:nperm_plot} visualizes its distribution. The distribution of cases provide a rough picture of the fieldwork activities and an indication of the robustness of the results in this report. 
+A total of `r length(unique(Mainf2f$intnum))` interviewers have at least one completed interview. Before interpreting the quality indicators in this report, it is important to bear in mind the number of interviews each interviewer has completed.  Table \ref{tab:table_nperm} provides a descriptive summary of the interviews per interviewer while figure \ref{fig:nperm_plot} visualizes its distribution. The distribution of cases provide a rough picture of the fieldwork activities and an indication of the robustness of the results in this report. 
 
 ```{r nperm, results = "asis", error=T}
 #Overview of interviews per interviewer
@@ -346,7 +346,7 @@ ggplot(df_duration, aes(duration, as.factor(intnum))) +
                                  "<30" = ESSColors[2],
                                  ">180" = ESSColors[3],
                                  "none"= "grey")) +
-  scale_x_continuous(breaks = seq(0, max(Main$intnum), 20)) + 
+  scale_x_continuous(breaks = seq(0, 240, 15)) +
   scale_y_discrete(breaks = duration_improb) +
   theme_light(base_size = 9, base_family = "Calibri") +
   theme(axis.title = element_text(size = 9, face = "plain"),
@@ -557,7 +557,7 @@ ggplot(dftime_120, aes(timebtwints, as.factor(intnum))) +
                color = "interval <30 minutes \nbetween consecutive \ninterviews") + 
           scale_colour_manual(values = c("FALSE" = "grey",
                                          "TRUE" = ESSColors[2])) +
-          scale_x_continuous(breaks = seq(0, max(Main$intnum), 20)) + 
+          scale_x_continuous(breaks = seq(0, max(dftime_120$timebtwints), 15)) + 
           scale_y_discrete(breaks = dftime_critical) +
           theme(plot.caption = element_text(hjust = 0.5))
 ```
@@ -589,30 +589,12 @@ where $inr_j$ gives the number of interviews in which a respondent gave a nonres
 
 ```{r nr_income, error=T}
 ### Create variables of interest: missingness per interviewer  ###         
-  # table scores for variable income                    
-    inc.mis <- Main %>%  
-                dplyr::select(intnum, hinctnta) %>%
-                group_by(intnum) %>%
-                table()
-    inc.mis.all <- as.data.frame(unclass(inc.mis))
-    inc.mis.all <- tibble::rownames_to_column(inc.mis.all, var = "intnum")
-    inc.mis.all$intnum <- as.numeric(inc.mis.all$intnum)
-
-  # add 99 as potential outcome to data.frame
-    help <- inc.mis.all %>%
-      select(intnum) %>%
-      mutate("99" = 0)
-    inc.mis.all <- left_join(inc.mis.all, help)
-
-  # How many values (i.e., interviews) per interviewer?  
-    inc.mis.all <- mutate(inc.mis.all, num.int = rowSums(inc.mis.all[, -1]))
-    # num.int <- rowsum(inc.mis)
-  
-  # Number of missings (either refusal or don't know) 
-    inc.mis.all <- mutate(inc.mis.all, num.mis = rowSums(inc.mis.all[,c("77", "88", "99")]))
-    # num.mis <- rowSums(inc.mis[,c("77", "88", "99")])
-    inc.mis.all <- mutate(inc.mis.all, prop.mis = num.mis/num.int)
-    # prop.mis <- num.mis/num.int # proportion
+# table scores for variable income                    
+inc.mis.all <- Main %>%  
+  dplyr::select(intnum, hinctnta) %>%
+  group_by(intnum) %>%
+  summarize(num.mis = sum(hinctnta %in% c(77, 88, 99)), num.int = n()) %>%
+  mutate(prop.mis = num.mis / num.int)
 ```
 
 Figure \ref{fig:plot1_nr_income} shows the distribution of the proportion of item nonresponse in the variable income, calculated according to Equation \ref{eq:nr_income} separately for all interviewers and interviewers with at least 10 interviews.
@@ -701,59 +683,58 @@ In addition to studying item nonresponse for a sensitive question like income, w
 For an overview, we first check the percentages of nonresponse on the items in *Module E*. Secondly, we summarize the proportion of item nonresponse on items in *Module E* of all interviews conducted by the same interviewer. The proportion of item nonresponse $p$ on items in *Module E* for each interviewer $j$ is calculated according to Equation \ref{eq:nr_income}. Subsequently, for each interviewer, we calculate the mean proportion of item nonresponse over these 20 items.
 
 ```{r nr_moduleE, error=T}
-# Selection of variables module Euman Values
-  hvc <- c("ipcrtiva", "impricha", "ipeqopta", "ipshabta", "impsafea", "impdiffa", 
-           "ipfrulea", "ipudrsta", "ipmodsta", "ipgdtima", "impfreea", "iphlppla",
-           "ipsucesa", "ipstrgva", "ipadvnta", "ipbhprpa", "iprspota", "iplylfra",
-            "impenva", "imptrada", "impfuna"
-           )
+# Selection of variables module Human Values
+hvc <- c("ipdopin", "ipstst",  "ipplea",  "ipnpea",  "ipbesuc", "ipetrju",
+         "ippoco",  "iphumb",  "ipprenv", "ipnhum",  "ipnexp",  "iphppcl",
+         "ipwlth",  "ipprsaf", "iptlppl", "ipnvreg", "ipmadec", "ipftrad",
+         "ippconf", "ipacrec")
 
 # create matrix to store percentage nonresponse per question
-  perc.nonr <- matrix(NA, nrow=length(hvc), ncol=1)
-  rownames(perc.nonr) <- hvc
-  colnames(perc.nonr) <- "perc_nonresponse"
+perc.nonr <- matrix(NA, nrow=length(hvc), ncol=1)
+rownames(perc.nonr) <- hvc
+colnames(perc.nonr) <- "perc_nonresponse"
   
-  for(i in hvc){
-    perc.nonr[i, ] <- sum(Main[[i]]==77|Main[[i]]==88|Main[[i]]==99)/nrow(Main)*100 
-  }
+for(i in hvc){
+  perc.nonr[i, ] <- sum(Main[[i]]==7|Main[[i]]==8|Main[[i]]==9)/nrow(Main)*100 
+}
   
 #   for(i in 1:length(hvc)){
 #   print(table(Main[,hvc[i]]))
 # }
 
 # write function that gives missings and proportion of missings   
-  prop_mis <- function(x){
+prop_mis <- function(x){
   tab <- Main %>%  
       group_by(intnum) %>% 
       dplyr::select(x) %>% 
       table()
       
-  if("77" %in% colnames(tab)==F) {
+  if("7" %in% colnames(tab)==F) {
       tab <- cbind(tab, 0)
-      colnames(tab)[colnames(tab)==""] <- 77
+      colnames(tab)[colnames(tab)==""] <- 7
   } 
     
-  if("88" %in% colnames(tab)==F) { 
+  if("8" %in% colnames(tab)==F) { 
       tab <- cbind(tab, 0)
-      colnames(tab)[colnames(tab)==""] <- 88
+      colnames(tab)[colnames(tab)==""] <- 8
   }
   
-    if("99" %in% colnames(tab)==F) { 
+    if("9" %in% colnames(tab)==F) { 
       tab <- cbind(tab, 0)
-      colnames(tab)[colnames(tab)==""] <- 99
+      colnames(tab)[colnames(tab)==""] <- 9
   }
-  
-    mis <- tab[,c("77", "88", "99")]
-    mis.tot <-  rowSums(mis)
-    int <- rowSums(tab)
-    prop.ref <- tab[,c("77")]/int
-    prop.dk <- tab[,c("88")]/int
-    prop.na <- tab[,c("99")]/int
-    prop.tot <- mis.tot/int
-    assign("tabout", cbind(rownames(mis), int, mis, mis.tot, prop.ref, prop.dk, prop.tot))
-    colnames(tabout) <- c("_id", "_nr.int", "_refused", "_dk", "_tot", "_prop.ref", "_prop.dk", "prop.na", "_prop.tot")
-    return(tabout)
-    }
+
+  mis <- tab[,c("7", "8", "9")]
+  mis.tot <-  rowSums(mis)
+  int <- rowSums(tab)
+  prop.ref <- tab[,c("7")]/int
+  prop.dk <- tab[,c("8")]/int
+  prop.na <- tab[,c("9")]/int
+  prop.tot <- mis.tot/int
+  assign("tabout", cbind(rownames(mis), int, mis, mis.tot, prop.ref, prop.dk, prop.tot))
+  colnames(tabout) <- c("_id", "_nr.int", "_refused", "_dk", "_tot", "_prop.ref", "_prop.dk", "prop.na", "_prop.tot")
+  return(tabout)
+}
 
 
 # Create empty list
@@ -770,18 +751,16 @@ For an overview, we first check the percentages of nonresponse on the items in *
   # summary(apply(check, 1, function(x) length(unique(x)) == 1)) # if 0 FALSE, we are good to go!
 
 # Descriptives for proportion missings per interviewer - per variable  
-  prop.total <- select(hvs.mis, ipcrtiva._nr.int, ends_with("_prop.tot"))
-  prop.total <- prop.total %>%
-    tibble::rownames_to_column(., var = "intnum") %>%
-    dplyr::rename(num.int = ipcrtiva._nr.int)
+prop.total <- select(hvs.mis, ipdopin._nr.int, ends_with("_prop.tot"))
+prop.total <- prop.total %>%
+  tibble::rownames_to_column(., var = "intnum") %>%
+  dplyr::rename(num.int = ipdopin._nr.int)
   
 # calculate the mean/variance/median proportion of missings for every interviewer and assign it
 # This is the average (or median/variance) calculated over all the HVS variables
-  
-  prop.total <- data.frame(lapply(prop.total, function(x) as.numeric(as.character(x))))
-  
-  prop.total <- prop.total %>%
-    mutate(meanmis = rowMeans(select(., -intnum, -num.int)))
+prop.total <- data.frame(lapply(prop.total, function(x) as.numeric(as.character(x))))
+prop.total <- prop.total %>%
+  mutate(meanmis = rowMeans(select(., -intnum, -num.int)))
 ```
 
 Figure \ref{fig:plot_nr_moduleE} shows the distribution of the average proportion of item nonresponse for all 20 items for each interviewer. It is calculated according to Equation \ref{eq:nr_income} separately for all interviewers and interviewers with at least 10 interviews.
@@ -877,7 +856,7 @@ High match rates within an interviewer could, therefore, be viewed as an indicat
 # Dataset with numeric survey items
 Main_mis <- Main %>%
   select(idno, intnum,
-         nwspol:impfuna) %>% 
+         stfloca:ipacrec) %>% 
   select_if(is.numeric)
 
 # Replace all non-substantial anwers with missing
@@ -888,30 +867,20 @@ Nchar <- Main_mis %>%
 
 try(for (i in 1:max(Nchar)) {
   Help <- Nchar[, Nchar[1, ] == i] # all variables with maximum characters==1
-  not_applicable <- paste(rep(6, max(Help)), collapse = "")
-  refusal <- paste(rep(7, max(Help)), collapse = "")
-  dont_know <- paste(rep(8, max(Help)), collapse = "")
-  no_answer <- paste(rep(9, max(Help)), collapse = "")
+  not_applicable <- as.numeric(paste(rep(6, max(Help)), collapse = ""))
+  refusal <- as.numeric(paste(rep(7, max(Help)), collapse = ""))
+  dont_know <- as.numeric(paste(rep(8, max(Help)), collapse = ""))
+  no_answer <- as.numeric(paste(rep(9, max(Help)), collapse = ""))
 
   Main_mis <- Main_mis %>% replace_with_na_at(.vars = names(Help),
                                               condition = ~.x == not_applicable)
   Main_mis <- Main_mis %>% replace_with_na_at(.vars = names(Help),
-                                              condition = ~.x %in% names(refusal))
+                                              condition = ~.x == refusal)
   Main_mis <- Main_mis %>% replace_with_na_at(.vars = names(Help),
-                                              condition = ~.x %in% names(dont_know))
+                                              condition = ~.x == dont_know)
   Main_mis <- Main_mis %>% replace_with_na_at(.vars = names(Help),
-                                              condition = ~.x %in% names(no_answer))
+                                              condition = ~.x == no_answer)
 }, silent = T)
-
-# special case Module E
-Modul_H <- select(Main, ipcrtiva:impfuna)
-Main_misH <- Main %>%
-  select(c(idno, intnum, ipcrtiva:impfuna)) %>%
-  replace_with_na_at(.vars = names(Modul_H),
-                     condition = ~.x %in% c(7, 8, 9))
-
-# Merge datasets
-Main_mis <- left_join(Main_mis, Main_misH, by= c("idno", "intnum"))
 
 #
 Duplicates <- select_if(Main_mis, colMeans(is.na(Main_mis))<0.1)
@@ -957,90 +926,87 @@ In our analysis approach, we measure non-differentiation by calculating the Mull
 ```{r nondiff, error=T}
 # Module E
 # define 7 (Refusal), 8 (Don't know), and 9 (No answer) as Na
-Modul_H <- select(Main, ipcrtiva:impfuna)
+Module_E <- select(Main, ipdopin:ipacrec)
 Main_nondiffE <- Main %>%
-  select(c(idno, intnum, ipcrtiva:impfuna)) %>%
-  replace_with_na_at(.vars = names(Modul_H),
+  select(c(idno, intnum, ipdopin:ipacrec)) %>%
+  replace_with_na_at(.vars = names(Module_E),
                      condition = ~.x %in% c(7, 8, 9))
 # normalization (x-min(x))/(max(x)-min(x)); min(x)=1; max(x)=6
 Main_nondiffE <- mutate(Main_nondiffE,
-                        h1 = ((ipcrtiva-1)/(6-1)), h2 = ((impricha-1)/(6-1)), h3 = ((ipeqopta-1)/(6-1)), h4 = ((ipshabta-1)/(6-1)),
-                        h5 = ((impsafea-1)/(6-1)), h6 = ((impdiffa-1)/(6-1)), h7 = ((ipfrulea-1)/(6-1)), h8 = ((ipudrsta-1)/(6-1)),
-                        h9 = ((ipmodsta-1)/(6-1)), h10 = ((ipgdtima-1)/(6-1)), h11 = ((impfreea-1)/(6-1)), h12 = ((iphlppla-1)/(6-1)),
-                        h13 = ((ipsucesa-1)/(6-1)), h14 = ((ipstrgva-1)/(6-1)), h15 = ((ipadvnta-1)/(6-1)), h16 = ((ipbhprpa-1)/(6-1)),
-                        h17 = ((iprspota-1)/(6-1)), h18 = ((iplylfra-1)/(6-1)), h19 = ((impenva-1)/(6-1)), h20 = ((imptrada-1)/(6-1)),
-                        h21 = ((impfuna-1)/(6-1)))
+                        h1 = ((ipdopin-1)/(6-1)), h2 = ((ipstst-1)/(6-1)), h3 = ((ipplea-1)/(6-1)), h4 = ((ipnpea-1)/(6-1)),
+                        h5 = ((ipbesuc-1)/(6-1)), h6 = ((ipetrju-1)/(6-1)), h7 = ((ippoco-1)/(6-1)), h8 = ((iphumb-1)/(6-1)),
+                        h9 = ((ipprenv-1)/(6-1)), h10 = ((ipnhum-1)/(6-1)), h11 = ((ipnexp-1)/(6-1)), h12 = ((iphppcl-1)/(6-1)),
+                        h13 = ((ipwlth-1)/(6-1)), h14 = ((ipprsaf-1)/(6-1)), h15 = ((iptlppl-1)/(6-1)), h16 = ((ipnvreg-1)/(6-1)),
+                        h17 = ((ipmadec-1)/(6-1)), h18 = ((ipftrad-1)/(6-1)), h19 = ((ippconf-1)/(6-1)), h20 = ((ipacrec-1)/(6-1)))
 # straighliners defined as MRP (mean root of pairs)
 Main_nondiffE <- mutate(Main_nondiffE,
                         h_mrp= ((sqrt(abs(h1-h2)) + sqrt(abs(h1-h3)) + sqrt(abs(h1-h4)) + sqrt(abs(h1-h5)) + sqrt(abs(h1-h6)) +
                                    sqrt(abs(h1-h7)) + sqrt(abs(h1-h8)) + sqrt(abs(h1-h9)) + sqrt(abs(h1-h10)) + sqrt(abs(h1-h11)) +
                                    sqrt(abs(h1-h12)) + sqrt(abs(h1-h13)) + sqrt(abs(h1-h14)) + sqrt(abs(h1-h15)) + sqrt(abs(h1-h16)) +
-                                   sqrt(abs(h1-h17)) + sqrt(abs(h1-h18)) + sqrt(abs(h1-h19)) + sqrt(abs(h1-h20)) + sqrt(abs(h1-h21)) +
+                                   sqrt(abs(h1-h17)) + sqrt(abs(h1-h18)) + sqrt(abs(h1-h19)) + sqrt(abs(h1-h20)) +
                                    
                                    sqrt(abs(h2-h3)) + sqrt(abs(h2-h4)) + sqrt(abs(h2-h5)) + sqrt(abs(h2-h6)) +
                                    sqrt(abs(h2-h7)) + sqrt(abs(h2-h8)) + sqrt(abs(h2-h9)) + sqrt(abs(h2-h10)) + sqrt(abs(h2-h11)) +
                                    sqrt(abs(h2-h12)) + sqrt(abs(h2-h13)) + sqrt(abs(h2-h14)) + sqrt(abs(h2-h15)) + sqrt(abs(h2-h16)) +
-                                   sqrt(abs(h2-h17)) + sqrt(abs(h2-h18)) + sqrt(abs(h2-h19)) + sqrt(abs(h2-h20)) + sqrt(abs(h2-h21)) +
+                                   sqrt(abs(h2-h17)) + sqrt(abs(h2-h18)) + sqrt(abs(h2-h19)) + sqrt(abs(h2-h20)) +
                                    
                                    sqrt(abs(h3-h4)) + sqrt(abs(h3-h5)) + sqrt(abs(h3-h6)) +
                                    sqrt(abs(h3-h7)) + sqrt(abs(h3-h8)) + sqrt(abs(h3-h9)) + sqrt(abs(h3-h10)) + sqrt(abs(h3-h11)) +
                                    sqrt(abs(h3-h12)) + sqrt(abs(h3-h13)) + sqrt(abs(h3-h14)) + sqrt(abs(h3-h15)) + sqrt(abs(h3-h16)) +
-                                   sqrt(abs(h3-h17)) + sqrt(abs(h3-h18)) + sqrt(abs(h3-h19)) + sqrt(abs(h3-h20)) + sqrt(abs(h3-h21)) +
+                                   sqrt(abs(h3-h17)) + sqrt(abs(h3-h18)) + sqrt(abs(h3-h19)) + sqrt(abs(h3-h20)) +
                                    
                                    sqrt(abs(h4-h5)) + sqrt(abs(h4-h6)) +
                                    sqrt(abs(h4-h7)) + sqrt(abs(h4-h8)) + sqrt(abs(h4-h9)) + sqrt(abs(h4-h10)) + sqrt(abs(h4-h11)) +
                                    sqrt(abs(h4-h12)) + sqrt(abs(h4-h13)) + sqrt(abs(h4-h14)) + sqrt(abs(h4-h15)) + sqrt(abs(h4-h16)) +
-                                   sqrt(abs(h4-h17)) + sqrt(abs(h4-h18)) + sqrt(abs(h4-h19)) + sqrt(abs(h4-h20)) + sqrt(abs(h4-h21)) +
+                                   sqrt(abs(h4-h17)) + sqrt(abs(h4-h18)) + sqrt(abs(h4-h19)) + sqrt(abs(h4-h20)) +
                                    
                                    sqrt(abs(h5-h6)) +
                                    sqrt(abs(h5-h7)) + sqrt(abs(h5-h8)) + sqrt(abs(h5-h9)) + sqrt(abs(h5-h10)) + sqrt(abs(h5-h11)) +
                                    sqrt(abs(h5-h12)) + sqrt(abs(h5-h13)) + sqrt(abs(h5-h14)) + sqrt(abs(h5-h15)) + sqrt(abs(h5-h16)) +
-                                   sqrt(abs(h5-h17)) + sqrt(abs(h5-h18)) + sqrt(abs(h5-h19)) + sqrt(abs(h5-h20)) + sqrt(abs(h5-h21)) +
+                                   sqrt(abs(h5-h17)) + sqrt(abs(h5-h18)) + sqrt(abs(h5-h19)) + sqrt(abs(h5-h20)) +
                                    
                                    sqrt(abs(h6-h7)) + sqrt(abs(h6-h8)) + sqrt(abs(h6-h9)) + sqrt(abs(h6-h10)) + sqrt(abs(h6-h11)) +
                                    sqrt(abs(h6-h12)) + sqrt(abs(h6-h13)) + sqrt(abs(h6-h14)) + sqrt(abs(h6-h15)) + sqrt(abs(h6-h16)) +
-                                   sqrt(abs(h6-h17)) + sqrt(abs(h6-h18)) + sqrt(abs(h6-h19)) + sqrt(abs(h6-h20)) + sqrt(abs(h6-h21)) +
+                                   sqrt(abs(h6-h17)) + sqrt(abs(h6-h18)) + sqrt(abs(h6-h19)) + sqrt(abs(h6-h20)) +
                                    
                                    sqrt(abs(h7-h8)) + sqrt(abs(h7-h9)) + sqrt(abs(h7-h10)) + sqrt(abs(h7-h11)) +
                                    sqrt(abs(h7-h12)) + sqrt(abs(h7-h13)) + sqrt(abs(h7-h14)) + sqrt(abs(h7-h15)) + sqrt(abs(h7-h16)) +
-                                   sqrt(abs(h7-h17)) + sqrt(abs(h7-h18)) + sqrt(abs(h7-h19)) + sqrt(abs(h7-h20)) + sqrt(abs(h7-h21)) +
+                                   sqrt(abs(h7-h17)) + sqrt(abs(h7-h18)) + sqrt(abs(h7-h19)) + sqrt(abs(h7-h20)) +
                                    
                                    sqrt(abs(h8-h9)) + sqrt(abs(h8-h10)) + sqrt(abs(h8-h11)) +
                                    sqrt(abs(h8-h12)) + sqrt(abs(h8-h13)) + sqrt(abs(h8-h14)) + sqrt(abs(h8-h15)) + sqrt(abs(h8-h16)) +
-                                   sqrt(abs(h8-h17)) + sqrt(abs(h8-h18)) + sqrt(abs(h8-h19)) + sqrt(abs(h8-h20)) + sqrt(abs(h8-h21)) +
+                                   sqrt(abs(h8-h17)) + sqrt(abs(h8-h18)) + sqrt(abs(h8-h19)) + sqrt(abs(h8-h20)) +
                                    
                                    sqrt(abs(h9-h10)) + sqrt(abs(h9-h11)) +
                                    sqrt(abs(h9-h12)) + sqrt(abs(h9-h13)) + sqrt(abs(h9-h14)) + sqrt(abs(h9-h15)) + sqrt(abs(h9-h16)) +
-                                   sqrt(abs(h9-h17)) + sqrt(abs(h9-h18)) + sqrt(abs(h9-h19)) + sqrt(abs(h9-h20)) + sqrt(abs(h9-h21)) +
+                                   sqrt(abs(h9-h17)) + sqrt(abs(h9-h18)) + sqrt(abs(h9-h19)) + sqrt(abs(h9-h20)) +
                                    
                                    sqrt(abs(h10-h11)) +
                                    sqrt(abs(h10-h12)) + sqrt(abs(h10-h13)) + sqrt(abs(h10-h14)) + sqrt(abs(h10-h15)) + sqrt(abs(h10-h16)) +
-                                   sqrt(abs(h10-h17)) + sqrt(abs(h10-h18)) + sqrt(abs(h10-h19)) + sqrt(abs(h10-h20)) + sqrt(abs(h10-h21)) +
+                                   sqrt(abs(h10-h17)) + sqrt(abs(h10-h18)) + sqrt(abs(h10-h19)) + sqrt(abs(h10-h20)) +
                                    
                                    sqrt(abs(h11-h12)) + sqrt(abs(h11-h13)) + sqrt(abs(h11-h14)) + sqrt(abs(h11-h15)) + sqrt(abs(h11-h16)) +
-                                   sqrt(abs(h11-h17)) + sqrt(abs(h11-h18)) + sqrt(abs(h11-h19)) + sqrt(abs(h11-h20)) + sqrt(abs(h11-h21)) +
+                                   sqrt(abs(h11-h17)) + sqrt(abs(h11-h18)) + sqrt(abs(h11-h19)) + sqrt(abs(h11-h20)) +
                                    
                                    sqrt(abs(h12-h13)) + sqrt(abs(h12-h14)) + sqrt(abs(h12-h15)) + sqrt(abs(h12-h16)) +
-                                   sqrt(abs(h12-h17)) + sqrt(abs(h12-h18)) + sqrt(abs(h12-h19)) + sqrt(abs(h12-h20)) + sqrt(abs(h12-h21)) +
+                                   sqrt(abs(h12-h17)) + sqrt(abs(h12-h18)) + sqrt(abs(h12-h19)) + sqrt(abs(h12-h20)) +
                                    
                                    sqrt(abs(h13-h14)) + sqrt(abs(h13-h15)) + sqrt(abs(h13-h16)) +
-                                   sqrt(abs(h13-h17)) + sqrt(abs(h13-h18)) + sqrt(abs(h13-h19)) + sqrt(abs(h13-h20)) + sqrt(abs(h13-h21)) +
+                                   sqrt(abs(h13-h17)) + sqrt(abs(h13-h18)) + sqrt(abs(h13-h19)) + sqrt(abs(h13-h20)) +
                                    
                                    sqrt(abs(h14-h15)) + sqrt(abs(h14-h16)) +
-                                   sqrt(abs(h14-h17)) + sqrt(abs(h14-h18)) + sqrt(abs(h14-h19)) + sqrt(abs(h14-h20)) + sqrt(abs(h14-h21)) +
+                                   sqrt(abs(h14-h17)) + sqrt(abs(h14-h18)) + sqrt(abs(h14-h19)) + sqrt(abs(h14-h20)) +
                                    
                                    sqrt(abs(h15-h16)) +
-                                   sqrt(abs(h15-h17)) + sqrt(abs(h15-h18)) + sqrt(abs(h15-h19)) + sqrt(abs(h15-h20)) + sqrt(abs(h15-h21)) +
+                                   sqrt(abs(h15-h17)) + sqrt(abs(h15-h18)) + sqrt(abs(h15-h19)) + sqrt(abs(h15-h20)) +
                                    
-                                   sqrt(abs(h16-h17)) + sqrt(abs(h16-h18)) + sqrt(abs(h16-h19)) + sqrt(abs(h16-h20)) + sqrt(abs(h16-h21)) +
+                                   sqrt(abs(h16-h17)) + sqrt(abs(h16-h18)) + sqrt(abs(h16-h19)) + sqrt(abs(h16-h20)) +
                                    
-                                   sqrt(abs(h17-h18)) + sqrt(abs(h17-h19)) + sqrt(abs(h17-h20)) + sqrt(abs(h17-h21)) +
+                                   sqrt(abs(h17-h18)) + sqrt(abs(h17-h19)) + sqrt(abs(h17-h20)) +
                                    
-                                   sqrt(abs(h18-h19)) + sqrt(abs(h18-h20)) + sqrt(abs(h18-h21)) +
+                                   sqrt(abs(h18-h19)) + sqrt(abs(h18-h20)) +
                                    
-                                   sqrt(abs(h19-h20)) + sqrt(abs(h19-h21)) +
-                                   
-                                   sqrt(abs(h20-h21)))/210))
+                                   sqrt(abs(h19-h20)))/190))
                         
 # Normalization and reverse coding of Mulligan Score (Score between 0...least straightlining and 1...most straighlining)
 Main_nondiffE <- mutate(Main_nondiffE, 
@@ -1052,21 +1018,22 @@ Mulligan_E_all <- Main_nondiffE %>%
   group_by(intnum) %>%
   summarise(avg=mean(h_mulligan, na.rm = TRUE)) %>%
   mutate(group = "All interviewers")
-# average interviwer speed for interviewers with at least 4 interviews
+# average Mulligan Score for interviewers with at least 4 interviews
 Mulligan_E_4 <- Main_nondiffE %>%
   group_by(intnum) %>%
   filter(n() > 3) %>%
   summarise(avg=mean(h_mulligan, na.rm = TRUE)) %>%
   mutate(group = "Interviewers with at least 4 interviews")
 
-Mulligan <- bind_rows(Mulligan_E_all, Mulligan_E_4)
+Mulligan <- bind_rows(Mulligan_E_all, Mulligan_E_4) %>%
+  mutate(avg = ifelse(is.nan(avg), NA, avg))
 
-  # Flag outliers
-  Mulligan <- Mulligan %>%
-    mutate(is_outlier=ifelse(is_outlier(as.numeric(avg)), as.numeric(avg), as.numeric(NA))) %>%
-    mutate(intnum_out = intnum)
-    Mulligan$intnum_out[which(is.na(Mulligan$is_outlier))] <- as.numeric(NA)
-  
+# Flag outliers
+Mulligan <- Mulligan %>%
+  mutate(is_outlier=ifelse(is_outlier(as.numeric(avg)), as.numeric(avg), as.numeric(NA))) %>%
+  mutate(intnum_out = intnum)
+Mulligan$intnum_out[which(is.na(Mulligan$is_outlier))] <- as.numeric(NA)
+
 # # Define outlier in h_mulligan
 # Main_nondiffE <- Main_nondiffE %>%
 #   #tibble::rownames_to_column(var="outlier") #%>%
@@ -1122,19 +1089,19 @@ Mscores_descr <- psych::describe(CatPCA$m_intscore, quant=c(.05,.95)) %>%
 SDscores_descr <- psych::describe(CatPCA$sd_intscore, quant=c(.05,.95)) %>%
   select(mean, median, sd, Q0.05, Q0.95)
 
-  # Flag outliers in mean scores
-  CatPCA <- CatPCA %>%
-    mutate(outlier_m=ifelse(m_intscore > (Mscores_descr$mean + Mscores_descr$sd*2) | m_intscore < (Mscores_descr$mean + Mscores_descr$sd*-2)  , as.numeric(m_intscore), as.numeric(NA))) %>%
-    mutate(intnum_out_m = intnum)
-    CatPCA$intnum_out_m[which(is.na(CatPCA$outlier_m))] <- as.numeric(NA)
-    CatPCA$is_outlier_m <- ifelse(is.na(CatPCA$outlier_m), "No", "Yes")
+# Flag outliers in mean scores
+CatPCA <- CatPCA %>%
+  mutate(outlier_m=ifelse(m_intscore > (Mscores_descr$mean + Mscores_descr$sd*2) | m_intscore < (Mscores_descr$mean + Mscores_descr$sd*-2)  , as.numeric(m_intscore), as.numeric(NA))) %>%
+  mutate(intnum_out_m = intnum)
+  CatPCA$intnum_out_m[which(is.na(CatPCA$outlier_m))] <- as.numeric(NA)
+  CatPCA$is_outlier_m <- ifelse(is.na(CatPCA$outlier_m), "No", "Yes")
     
-      # Flag outliers in sd of scores
-  CatPCA <- CatPCA %>%
-    mutate(outlier_sd=ifelse(sd_intscore > (SDscores_descr$mean + SDscores_descr$sd*2) | sd_intscore < (SDscores_descr$mean + SDscores_descr$sd*-2), as.numeric(sd_intscore), as.numeric(NA))) %>%
-    mutate(intnum_out_sd = intnum)
-    CatPCA$intnum_out_sd[which(is.na(CatPCA$outlier_sd))] <- as.numeric(NA)
-    CatPCA$is_outlier_sd <- ifelse(is.na(CatPCA$outlier_sd), "No", "Yes")
+# Flag outliers in sd of scores
+CatPCA <- CatPCA %>%
+  mutate(outlier_sd=ifelse(sd_intscore > (SDscores_descr$mean + SDscores_descr$sd*2) | sd_intscore < (SDscores_descr$mean + SDscores_descr$sd*-2), as.numeric(sd_intscore), as.numeric(NA))) %>%
+  mutate(intnum_out_sd = intnum)
+  CatPCA$intnum_out_sd[which(is.na(CatPCA$outlier_sd))] <- as.numeric(NA)
+  CatPCA$is_outlier_sd <- ifelse(is.na(CatPCA$outlier_sd), "No", "Yes")
 ```
 
 To estimate the effect that interviewers have on the answers of respondents, we calculate (a) the mean of component scores of the first component across interviews conducted by the same interviewer and (b) the standard deviations of those scores. We limit the analysis to interviewers with at least 15 interviews completed, as suggested by the literature [@blasius2018], if the maximum number of interviews per interviewer in the dataset is greater than 15. Otherwise, we limit the analysis to interviewers with at least 10 interviews.
@@ -1143,7 +1110,7 @@ To estimate the effect that interviewers have on the answers of respondents, we 
 
 The component scores indicate the distance of each case from to the overall estimated dimension (centered at 0). By calculating the mean of the component scores per interviewer, we can estimate how strongly the answers of respondents interviewed by each interviewer related to the overall component. Figure \ref{fig:plot1_latentvar}, shows the distribution of the mean of the component scores per interviewer. Means that are very different to zero indicate that respondents allocated to those interviewers answered very differently to the battery on trust in institutions compared to the whole sample. For example, a very high mean would indicate that respondents from interviewer X tend to show much more trust in institutions compared to the overall trust of respondents in the sample. To facilitate the overview of results, we define and present outliers with ± 2 standard deviations from the interviewers' mean of means. 
 
-```{r latentvar_plot1, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:plot1_latentvar} Mean of component scores across interviews",  linebreak, "Note: Interviewers whose mean score exceeds ± 2 standard deviations from the mean across interviewers are highlighted."), fig.scap="Mean of component scores across interviews", error=T}
+```{r latentvar_plot1, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:plot1_latentvar} Mean of component scores across interviews", linebreak, "Note: Interviewers whose mean score exceeds ± 2 standard deviations from the mean across interviewers are highlighted."), fig.scap="Mean of component scores across interviews", error=T}
 ggplot(CatPCA, aes(m_intscore, as.factor(intnum)))  + 
   geom_point(aes(colour = CatPCA$is_outlier_m)) +
   labs(x = "Mean CatPCA score loading across interviews",

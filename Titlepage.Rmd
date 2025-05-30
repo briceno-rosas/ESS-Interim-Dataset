@@ -4,11 +4,11 @@
     \includegraphics[width = 6cm]{ESSlogo.png}
     \vfill
     \raggedright
-    {\bf \fontsize{40pt}{50pt}\selectfont Interim Dataset Analysis, Round 11}\\[1 cm]
+    {\bf \fontsize{40pt}{50pt}\selectfont Interim Dataset Analysis, Round 12}\\[1 cm]
     {\sc \fontsize{20pt}{30pt}\selectfont Report of Standardised Analysis for Detection of Interviewer-Controlled Issues}\\[1 cm]
     \vfill
     \begin{center}\large
-    ESS ERIC Core Scientific Team\footnote[1]{Authors: Roberto Briceno-Rosas (GESIS Leibniz Institute for the Social Science in Mannheim, Germany), May Dousak (University of Ljubljana, Slovenia), Paulette Flore and Joost Kappelhof (SCP - The Netherlands Institute for Social Science Research, The Netherlands) / For internal distribution only.}
+    ESS ERIC Core Scientific Team\footnote[1]{Authors: Roberto Briceno-Rosas (GESIS Leibniz Institute for the Social Science in Mannheim, Germany), May Dousak (University of Ljubljana, Slovenia), Paulette Flore and Joost Kappelhof (SCP - The Netherlands Institute for Social Science Research, The Netherlands). Updated for Round 12 by Alex Seitz (GESIS). For internal distribution only.}
     \end{center}
     \begin{center}
     {\large \today}
