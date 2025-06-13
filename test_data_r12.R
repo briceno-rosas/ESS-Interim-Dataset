@@ -59,19 +59,19 @@ Synth$einwe <- Synth$inwds + sample(1200:11000, n_synth, replace = TRUE)
 
 # Write synthetic data
 
-write_sav(Synth, "DATA_R12/data_simulated.sav")
+write_sav(Synth, "DATA_R12/ESS12_EXAMPLE_MAIN_QUESTIONNAIRE.sav")
 
 Synth %>% mutate(
   inwds = as_datetime(inwds, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
   ainws = as_datetime(ainws, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
   einwe = as_datetime(einwe, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S")
-) %>% write.csv("DATA_R12/data_simulated.csv", row.names = F)
+) %>% write.csv("DATA_R12/ESS12_EXAMPLE_MAIN_QUESTIONNAIRE.csv", row.names = F)
 
 Synth1 = Synth %>% mutate(
   inwds = as_datetime(inwds, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
   ainws = as_datetime(ainws, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
   einwe = as_datetime(einwe, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S")
-) %>% write.dta("DATA_R12/data_simulated.dta", convert.dates = F)
+) %>% write.dta("DATA_R12/ESS12_EXAMPLE_MAIN_QUESTIONNAIRE.dta", convert.dates = F)
 
 # Simulate interviewers
 
@@ -89,6 +89,6 @@ intnums <- tibble(
 
 ## Export assignments
 
-write_sav(intnums, "DATA_R12/intnums_simulated.sav")
-write.csv(intnums, "DATA_R12/intnums_simulated.csv", row.names = F)
-write.dta(intnums, "DATA_R12/intnums_simulated.dta")
+write_sav(intnums, "DATA_R12/ESS12_EXAMPLE_INTERVIEWER_QUESTIONNAIRE.sav")
+write.csv(intnums, "DATA_R12/ESS12_EXAMPLE_INTERVIEWER_QUESTIONNAIRE.csv", row.names = F)
+write.dta(intnums, "DATA_R12/ESS12_EXAMPLE_INTERVIEWER_QUESTIONNAIRE.dta")
