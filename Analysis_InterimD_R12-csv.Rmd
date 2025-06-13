@@ -104,16 +104,10 @@ themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
 
 ```{r getdata, error=T}
 # Interviewer-Questionnaire with Inwer ID (intnum):
-Inwer <- foreign::read.spss(params$intFile,
-                  use.value.labels = F,
-                  use.missings = F,
-                  to.data.frame = T)
+Inwer <- read.csv(params$intFile)
 
 # Main Dataset
-Main <- foreign::read.spss(params$mainFile,
-                  use.value.labels = F,
-                  use.missings = F,
-                  to.data.frame = T)
+Main <- read.csv(params$mainFile)
 
 #Variable names to lower cases
 names(Inwer) <- tolower(names(Inwer))
@@ -269,11 +263,10 @@ ggplot(tab_niwer, aes(n, as.factor(intnum))) +
 
 ```{r timestamps, error=T}
 # fulldate for interviews
-Main$fulldate <- as_datetime(Main$inwds, origin = "1582-10-14")
+Main$fulldate <- dmy_hms(Main$inwds)
 # fulldatetime for start and end of interview
-Main$start <- as_datetime(Main$inwds, origin = "1582-10-14")
-Main$end <- as_datetime(Main$einwe, origin = "1582-10-14")
-test <- Main %>% select(inwds, start, einwe, end) %>% mutate(duration = end - start)
+Main$start <- dmy_hms(Main$inwds)
+Main$end <- dmy_hms(Main$einwe)
 ```
 
 In this section, indicators for detection of issues in interviewing process are drawn from the analysis of timestamps recorded for each interview (start and end of the interview, including timestamps for each module, and date and time of interview). Timestamps provide critical information about the conduction of the interview in the field and can help detect issues in the interviewing process. 
@@ -373,7 +366,7 @@ if(nrow(df_duration_improb_table)==0) {
       caption = paste("\\label{tab:table_duration} Interviewers with unlikely interview durations"))  %>%
   kable_styling(latex_options = c("hold_position")) %>%
   collapse_rows(columns = 1)
-  }	
+  }
 ```
 
 The general recommendation here is to go back to the survey agency (or fieldwork coordinator or interviewer in case of an in-house survey) and have them check these results with the interviewer in question. Especially in the case of interview duration, other indicators like item nonresponse (see next sections) should be taken into consideration.

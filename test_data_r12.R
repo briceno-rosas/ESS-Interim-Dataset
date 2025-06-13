@@ -28,26 +28,28 @@ Main <- Main %>% mutate(
 )
 
 # Generate synthetic data
-n_synth = 1000
 
-# Synth <- matrix(nrow = n_synth, ncol = ncol(Main) - 1)
+n_synth = 2000
 
-Synth <- Main %>%
+Main1 <- Main %>%
   mutate(
     nwspol = ifelse(nwspol > 1440 & !nwspol %in% c(6666, 7777, 8888), 1440, nwspol),
     netustm = ifelse(netustm > 1440 & !netustm %in% c(6666, 7777, 8888), 1440, netustm)) %>%
-  select(-c(cntry, idno, inwds, ainws, einwe, scresolu)) %>%
-  apply(2, function(col) {
-    if (is.na(sum(as.numeric(col)))) {
-      sample(col, n_synth, replace = TRUE)
-    } else {
-      if (length(attr(col, "value.labels")) > 3) {
-        sample(attr(col, "value.labels"), n_synth, replace = TRUE)
-      } else {
-        sample(min(col):max(col), n_synth, replace = TRUE)
-      }
-    }
-  }) %>% as.data.frame() %>% mutate_if(is.character, as.numeric)
+  select(-c(cntry, idno, inwds, ainws, einwe, scresolu))
+Synth <- names(Main1) %>% lapply(function(cname) {
+  col <- Main1[[cname]]
+  if (is.na(sum(as.numeric(col)))) {
+    sample(col, n_synth, replace = TRUE)
+  } else if ("Very much like me" %in% names(attr(col, "value.labels"))) { # HVS
+    sample(c(9, 8, 7, 1:6, 1:6, 1:6, 1:6), n_synth, replace = TRUE)
+  } else if (length(attr(col, "value.labels")) > 3) {
+    sample(attr(col, "value.labels"), n_synth, replace = TRUE)
+  } else {
+    sample(min(col):max(col), n_synth, replace = TRUE)
+  }
+})
+names(Synth) <- names(Main1)
+Synth <- Synth %>% as.data.frame() %>% mutate_if(is.character, as.numeric)
 
 Synth$idno <- (max(Main$idno) + 1):(max(Main$idno) + n_synth)
 Synth$cntry <- sample(Main$cntry, n_synth, replace = TRUE)
@@ -55,28 +57,38 @@ Synth$inwds <- sample(min(Main$inwds):max(Main$inwds), n_synth, replace = TRUE)
 Synth$ainws <- Synth$inwds
 Synth$einwe <- Synth$inwds + sample(1200:11000, n_synth, replace = TRUE)
 
-# Merge datasets
+# Write synthetic data
 
-# Combined <- bind_rows(Main, Synth)
-Combined <- Synth
+write_sav(Synth, "DATA_R12/data_simulated.sav")
 
-# Write combined data
+Synth %>% mutate(
+  inwds = as_datetime(inwds, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
+  ainws = as_datetime(ainws, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
+  einwe = as_datetime(einwe, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S")
+) %>% write.csv("DATA_R12/data_simulated.csv", row.names = F)
 
-write_sav(Combined, "DATA_R12/data_simulated.sav")
+Synth1 = Synth %>% mutate(
+  inwds = as_datetime(inwds, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
+  ainws = as_datetime(ainws, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S"),
+  einwe = as_datetime(einwe, origin = "1582-10-14") %>% format("%d-%m-%Y %H:%M:%S")
+) %>% write.dta("DATA_R12/data_simulated.dta", convert.dates = F)
 
 # Simulate interviewers
 
 ## Shuffle idnos
 
-ids <- (Combined %>% filter(mode %in% c(1, 2)))$idno %>% sample(replace = F)
+ids <- (Synth %>% filter(mode %in% c(1, 2)))$idno %>% sample(replace = F)
 
 ## Generate interviewer ids and assign interviews to random interviewers
 
-n_int <- 60
+n_int <- 40
 
-intnums <- sample(1:n_int, length(ids), replace = T)
+intnums <- tibble(
+  idno = ids, 
+  intnum = sample(1:n_int, length(ids), replace = T))
 
 ## Export assignments
 
-tibble(idno = ids, intnum = intnums) %>% 
-  write_sav("DATA_R12/intnums_simulated.sav")
+write_sav(intnums, "DATA_R12/intnums_simulated.sav")
+write.csv(intnums, "DATA_R12/intnums_simulated.csv", row.names = F)
+write.dta(intnums, "DATA_R12/intnums_simulated.dta")
