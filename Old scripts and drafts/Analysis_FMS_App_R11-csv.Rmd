@@ -1,0 +1,1827 @@
+---
+output:
+  pdf_document:
+    includes:
+      in_header: styles.tex
+    number_sections: TRUE
+    latex_engine: xelatex
+    fig_caption: yes
+    fig_width: 4
+    fig_height: 3
+    keep_tex: TRUE
+header-includes:
+  - \usepackage{titling}
+  - \setlength{\droptitle}{5em} 
+papersize: a4paper
+fontsize: 11pt
+mainfont: Carlito
+geometry: margin = 3cm
+subparagraph: TRUE
+graphics: yes
+bibliography: References.bib
+csl: apa.csl
+link-citations: yes
+params:
+  mainFile: ""
+  intFile: ""
+
+# European Social Survey - European Research Infrastructure (ESS-ERIC)
+# europeansocialsurvey.org
+#Notes
+#Version: 2.2
+---
+
+```{r setup, include = FALSE, error=T}
+library(knitr)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo = FALSE, results = "hide", message = FALSE, dev = "cairo_pdf", warning = FALSE)
+knitr::opts_chunk$set(fig.pos = 'H')
+
+options(knitr.table.format = "latex", knitr.kable.NA = "")
+
+Sys.setlocale("LC_ALL","English")
+```
+
+```{r setup2, include=TRUE, cache = FALSE, error=TRUE}
+
+library(here) 
+library(foreign)
+library(dplyr)
+library(psych)
+library(ggplot2)
+library(lubridate)
+library(wesanderson)
+library(colortools) # adjacent works
+library(ggthemes) # theme_tufte works
+library(varhandle) # coercing factor to numeric variables
+library(naniar) # for replacing values with missings
+library("Gifi") #Implements categorical principal component analysis
+library(matrixStats) #High-performing functions operating on rows and columns of matrice
+library(cowplot)
+library(tibble)
+library(reshape2) #!new in tool for FMS
+
+# for tables
+library(knitr)
+library(kableExtra)
+library(formattable) #!new in tool for FMS
+
+```
+
+```{r fuctions, error=T}
+source("Utility functions.R")
+
+## More functions
+# Response Rate, Non-contact Rate, Refusal Rate, Coop-rate
+r1 <- function(net,gross,i) { (net / (gross - i))*100 }
+# Rate of Ineligibles
+r2 <- function(net,gross){ (net/gross)*100 }
+```
+
+```{r theme, error=T}
+ESSred <- rgb(.91, .20, .32)
+ESSgreen <- rgb(.14, .62, .51)
+ESSblue <- rgb(0, .25, .48)
+  
+ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+
+ESSColors <- c(ESSColors, ESSgreen, ESSblue)
+# pizza(ESSColors)
+
+themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
+    theme(axis.title = element_text(size = 9, face = "plain"),
+          axis.text = element_text(size = 9),
+          axis.line.x = element_line(),
+          plot.title = element_blank(),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 9),
+          strip.text = element_text(size = 9, face = "bold"),
+          legend.position = "none",
+          legend.direction = "horizontal",
+          legend.box = "vertical",
+          legend.spacing = unit(0, "line"),
+          legend.key.size = unit(.75, "line"))
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+\newpage
+\FloatBarrier
+\pagenumbering{gobble}
+
+```{r child = "Titlepage_fms_app.Rmd", error=T}
+```
+
+\pagenumbering{arabic}
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+\listoftables
+\listoffigures
+
+# Introduction {-}
+
+```{r getdata, error=T}
+
+# CF data from App with Inwer ID (intnum). Use either params.
+CF <- read.csv2(params$intFile,  sep = ",", dec=".", stringsAsFactors=F)
+CF <- read.csv2(params$mainFile,  sep = ",", dec=".", stringsAsFactors=F)
+
+```
+
+```{r fms_metaifno, error=T}
+#FMS version
+FMSv <- "FMS App"
+```
+
+```{r countrynames, error=T}
+#read country specific data (for variable Country)
+Country <- read.csv2("Country names and codes.csv", dec = ".", stringsAsFactors = F) # !Alert! if new country, add country
+
+#This country
+CF <- left_join(CF, Country, by = "cntry")
+thisCountry <- unique(CF$CountryName)
+
+```
+
+This report presents the results of the analysis of the `r FMSv` for `r thisCountry`. It aims to help national teams to detect interviewer-related issues in the field based on the Contact Forms data. It also provides some information on other indicators from the fieldwork progress, which are currently not included in the web version of the FMS.
+
+The indicators presented in the report are saved as CSV files in the “Annex” folder that can be found within the tool. As it is not always possible to read all the information or details directly from the figures, this allows everyone to inspect the source files and use the indicators for further analysis if necessary. 
+
+The report is divided into two sections. The first section presents an overview of the state of fieldwork using indicators for all sample units. The second section \ref{sec:level1indicators}focuses on interviewer level indicators for cases that are currently assigned to these interviewers and provides some indicators on each contact attempt made by the interviewers so far. 
+
+Each section includes an explanation of the meaning of the indicator and how it is calculated (if applicable). Explanations on how the indicators can be helpful to monitor interviewer behaviour are also included, although these are by no means exhaustive. The usefulness of indicators will also depend on the specific characteristics of the fieldwork of the countries, the stage of fieldwork, and the evolution of fieldwork.
+
+It is recommended to view these indicators as complementary to the information coming from the field and as complementary to each other. They help gain further insights into activities in the area. They do not explain the reasons for deviations or extreme values. It is recommended to discuss the results with colleagues and view the indicators in conjunction with other information available on the fieldwork. 
+
+
+# Overview of fieldwork {#sec:fiedlworkoverview}
+
+Before inspecting the work conducted by the interviewers, it is recommended to view the overall state of fieldwork. This allows contextualizing the work of the interviewer in the field. This section provides further indicators on the state of the fieldwork compared to those available on the FMS website. 
+
+
+```{r OutcomeSetup1, error=T}
+##### Reshape data with outcome variables ####
+# count max contact attempts
+count_ca <- ncol(dplyr::select(CF, starts_with("resulb")))
+
+#Interva set to 5 to nullify its impact to outcome codes
+#"inwer_human_identifier" = intnum for current assignment. No information on interviewer responsible for each contact attempt
+CF$interva <- 5
+CF$intnum <- CF$iwer_human_identifier 
+# choose the variables from the dataset, we need to reshape
+CF_subset_ca_wide <- dplyr::select(CF, idno, cntry, intnum, interva,  # interva additionally included
+                                   num_range("dateca",1:count_ca),
+                                   num_range("modeca",1:count_ca),
+                                   num_range("dayv",1:count_ca),
+                                   num_range("resulb",1:count_ca),
+                                   num_range("outnic",1:count_ca),
+                                   num_range("outinval",1:count_ca))
+
+
+# reshape data from wide to long format
+CF_subset_ca_long <- CF_subset_ca_wide %>%
+  tidyr::gather(v, value, c(dateca1:paste0("outinval",count_ca)))  %>%
+  tidyr::separate(v, c("var", "attempt"), sep = "(?<=[A-Za-z])(?=[0-9])") %>%
+  tidyr::spread(var, value) %>%
+  dplyr::mutate(resulb = na_if(resulb, 66)) %>% #!Alert! Check if resulb=66 is "Not applicable"
+  dplyr::filter(complete.cases(resulb)) %>% # delete all cases were resulb is "Not applicable"
+  dplyr::rename(modev=modeca) # rename variable for standardization
+
+# attempt as numeric variable
+CF_subset_ca_long$attempt <- as.numeric(CF_subset_ca_long$attempt)
+
+# order rows by values
+CF_subset_ca_long <- CF_subset_ca_long %>% 
+  dplyr::arrange(idno, attempt)
+
+
+# #### Reshape data with interviewer as index (_iwer, merge2) #### REMOVE to accommodate for only one iwer in FMS (current)
+# ##Change to "iwer_human_identifier" 
+# names(CF)
+# # count max no of interviewers
+# count_iwer <- ncol(dplyr::select(CF, starts_with("intnum")))
+# 
+# # choose the variables from the dataset, we need to reshape
+# CF_subset_iwer_wide <- dplyr::select(CF, idno,
+#                                      num_range("intnum",1:count_iwer), 
+#                                      num_range("totcin",1:count_iwer))
+# 
+# # reshape data from wide to long format
+# CF_subset_iwer_long <- CF_subset_iwer_wide %>% 
+#   tidyr::gather(v, value, c(intnum1:paste0("totcin",count_iwer)))  %>% 
+#   tidyr::separate(v, c("var", "nint"), sep = "(?<=[A-Za-z])(?=[0-9])") %>%
+#   tidyr::spread(var, value) %>%
+#   dplyr::filter(complete.cases(totcin))
+# 
+# # nint as numeric variable
+# CF_subset_iwer_long$nint <- as.numeric(CF_subset_iwer_long$nint)
+# 
+# # order rows by values
+# CF_subset_iwer_long <- CF_subset_iwer_long %>%
+#   arrange(idno, nint)
+# 
+# # add assignment to cases
+# CF_subset_iwer_long <- CF_subset_iwer_long %>%
+#   group_by(idno) %>%
+#   dplyr::mutate(assignment = row_number())
+# 
+# # recode 666 and 999 in totcin to 1
+# CF_subset_iwer_long$totcin[CF_subset_iwer_long$totcin==666] <- 1 #!Alert! Check if totcin=666 is "Not applicable" 
+# CF_subset_iwer_long$totcin[CF_subset_iwer_long$totcin==999] <- 1 #!Alert! Check if totcin=999 is "Not available" 
+# 
+# # replicate all cases with the value of totcin
+# CF_subset_iwer_long <- CF_subset_iwer_long %>%
+#   dplyr::slice(rep(1:n(), totcin)) 
+# 
+# # add contact attempts to the cases
+# CF_subset_iwer_long <- CF_subset_iwer_long %>%
+#   dplyr::group_by(idno) %>%
+#   dplyr::mutate(attempt = row_number())
+
+
+#### Merge, filter, rename long datasets ####
+# join matching values from CF_subset_iwer_long to CF_subset_ca_long
+#CF.CA.LONG <-  dplyr::left_join(CF_subset_ca_long, CF_subset_iwer_long, copy = FALSE, by = c("idno", "attempt"))
+CF.CA.LONG <- CF_subset_ca_long
+# filter cases
+CF.CA.LONG <- CF.CA.LONG %>%
+  dplyr::filter(is.na(dateca) | modev !=99 | resulb !=99 | outnic!=99) #!Alert! check if 99 is "Not available"
+
+#CF.CA.LONG$intnum[CF.CA.LONG$intnum==666666] <- 999999 #!Alert! check if 666666 is "Not applicable"
+
+# rename outnic and resulb
+CF.CA.LONG <- CF.CA.LONG %>%
+  dplyr::rename(resul=resulb, outni=outnic) %>%
+  dplyr::mutate(outni = na_if(outni, "66"))
+
+```
+
+
+```{r DataPrep2, error=T}
+##### Add variables to CF Long ######
+
+# read Country names
+#Country <- read.csv2("data/Country names and codes.csv", dec = ".", stringsAsFactors = F) # !Alert! if new country, add country
+#!check! is country name useful for single country file?
+
+
+### Fieldwork period !check! needed? R9 needed to create fulldata
+# read start and end data
+#Date_seg <-  read.csv2("data/Date segments.csv", dec = ".", stringsAsFactors = F) # !Alert! add new round if neccessary
+# read fieldwork month
+#Fieldwork <- read.csv2("data/Fieldwork months R1-R9.csv", dec = ".", stringsAsFactors = F) # !Alert! add new round if neccessary
+
+#Seg are required to define the start and end of fieldwork for other variables like 'week of fieldwork' to work.
+
+#Mode #
+# modev2:   = "Personal visit" if modev is 1 or 3 #### !Alert! Check corresponding values
+#          = "Telephone" if modev is 2
+#          = "Video" if modev is 5
+#          = "Other" if modev is 4, or 6
+CF.CA.LONG$modev2 <- ifelse(CF.CA.LONG$modev %in% c(1,3), "Personal visit",
+                            ifelse(CF.CA.LONG$modev %in% 2, "Telephone",
+                                   ifelse(CF.CA.LONG$modev %in% 5, "Video",
+                                          ifelse(CF.CA.LONG$modev %in% c(4,6), "Other", NA))))
+
+#Attempt
+# firstattempt: = "First attempt" if attempt=1
+#               = "Follow-up" if attempt is >1
+CF.CA.LONG$firstattempt <- ifelse(CF.CA.LONG$attempt %in% 1, "First attempt", "Follow-up")
+
+#Contact status
+# contactstatus: 0 = "No contact with anyone"
+#                1 = "Contact, don't know if target respondent or someone other than target respondent"
+#                2 = "Contact with target respondent"
+CF.CA.LONG$contactstatus <- ifelse(CF.CA.LONG$resul %in% c(6:8), 0,
+                                   ifelse(CF.CA.LONG$resul %in% c(3,5), 1,
+                                          ifelse(CF.CA.LONG$resul %in% c(1,2,4), 2, NA)))
+
+#First contact
+# anycontact (helping variable)
+a <- aggregate(contactstatus ~ idno, data = CF.CA.LONG, function(x) min(x[x %in% 1:2]))
+a <- a %>%
+  dplyr::rename(anycontact=contactstatus) %>%
+  mutate(anycontact=dplyr::recode(anycontact,
+                                  '1'="anycontact",
+                                  '2'= "anycontact",
+                                  'Inf' = "no contact"))
+CF.CA.LONG <- merge(CF.CA.LONG, a, by = "idno", all.x = T)
+
+#firstcontact variable
+a <- CF.CA.LONG %>%
+  group_by(idno) %>%
+  filter(contactstatus %in% 1:2) %>%
+  slice(1) %>%
+  mutate(firstcontact="First contact") %>%
+  select(idno, firstcontact, attempt)
+CF.CA.LONG <- left_join(CF.CA.LONG, a, by = c("idno", "attempt"))
+
+CF.CA.LONG$firstcontact <- ifelse(!is.na(CF.CA.LONG$firstcontact), CF.CA.LONG$firstcontact,
+                                  ifelse(is.na(CF.CA.LONG$firstcontact) & CF.CA.LONG$anycontact=="anycontact", "Other", NA))
+
+# attemptfirstcontact
+a <- CF.CA.LONG %>%
+  filter(firstcontact == "First contact") %>%
+  select(idno, attempt) %>%
+  dplyr::rename(attemptfirstcontact = attempt)
+CF.CA.LONG <- left_join(CF.CA.LONG, a, by = "idno", all.x = T)
+
+# delete help variable
+CF.CA.LONG <- select(CF.CA.LONG, -anycontact)
+
+```
+
+```{r OutcomeAlgorithmFuns, error=T}
+#### Original algorithm adapted for FMS App data ####
+
+# create the id-variable ID.Var
+ID.Var <- "idno"
+
+####  Function: Case-level call history outcome indicators ####
+
+DeriveCAindicators <- function(CF, CA.LONG){
+  # Order attempts
+  CA.LONG <- CA.LONG[with(CA.LONG, order(idno, attempt)),]
+  
+  # # Subset attempts for which (some) information is available ##Removed for FMS - include all data to allow spotting issues
+  # CA.LONG1 <- subset(CA.LONG, !(!is.na(dateca) & modeca == 9 &  #!Alert! dateca only for R10 data
+  #                                 resul == 99 & (is.na(outni) | (!is.na(outni) & outni == 99)) #& 
+  #                               #assignment == 999 & (is.na(refusal) | (!is.na(refusal) & refusal == 999))
+  # ))
+  # R9 VERSION - Subset attempts for which (some) information is available
+  # CA.LONG1 <- subset(CA.LONG, !(monv == 99 & date == 99 &
+  #                                 #yearv == 9999 &
+  #                                 dayv == 99 & hourv == 99 & minv == 99 & modev == 9 &
+  #                                 resul == 99 & (is.na(outni) | (!is.na(outni) & outni == 99)) #&
+  #                               #assignment == 999 & (is.na(refusal) | (!is.na(refusal) & refusal == 999))
+  # ))
+  #Simplified selection for CF fieldwork data (applies to R9 and R10)
+  CA.LONG1 <- subset(CA.LONG, !(resul == 99 & (is.na(outni) | (!is.na(outni) & outni == 99))
+                                               ))
+  # Any contact
+  a <- aggregate(resul ~ idno, data = CA.LONG1, 
+                 function(x) anycontact = ifelse(sum(x %in% c(1, 2, 4)) >= 1, 1, ifelse(sum(x == 5) >= 1, 2, ifelse(sum(x == 3) >= 1, 3, 0)))) %>%
+    plyr::rename(c("resul" = "anycontact")) # !Alert! rename works only with package plyr not with dplyr
+  
+  # Any refusal
+  b <- aggregate(outni ~ idno, data = CA.LONG1, function(x) anyrefusal = min(x[x %in% 2:4])) %>%
+    plyr::rename(c("outni" = "anyrefusal")) # !Alert! rename works only with package plyr not with dplyr
+  
+  # Any interview
+  c <- aggregate(resul ~ idno, data = CA.LONG1, function(x) anyinterview = min(x[x %in% 1:2])) %>%
+    plyr::rename(c("resul" = "anyinterview")) # !Alert! rename works only with package plyr not with dplyr
+  
+  # Last attempt resul and outni (AND outinval)
+  d <- subset(CA.LONG1, !duplicated(CA.LONG1[ID.Var], fromLast = TRUE))[c(ID.Var, "resul", "outni", "outinval")] %>%
+    plyr::rename(c("resul" = "lastattempt.resul",  # !Alert! rename works only with package plyr not with dplyr
+                   "outni" = "lastattempt.outni",
+                   "outinval" = "lastattempt.outinval")) #Added to accommodate for the FMS outinval values on every contact attempt
+  
+  # Subset attempts for which attempt result was not No contact at all or Not available
+  CA.LONG2 <- subset(CA.LONG1, !resul %in% c(6, 99) | (resul == 99 & !is.na(outni) & outni != 99)) 
+  
+  # Last "contact" or information
+  e <- subset(CA.LONG2, !duplicated(CA.LONG2[ID.Var], fromLast = TRUE))[c(ID.Var, "resul", "outni", "outinval")] %>%
+    plyr::rename(c("resul" = "lastcontact.resul", # !Alert! rename works only with package plyr not with dplyr
+                   "outni" = "lastcontact.outni",
+                   "outinval" = "lastcontact.outinval")) #Added to accommodate for the FMS outinval values on every contact attempt 
+  # Merge
+  all <- plyr::join_all(list(CF[ID.Var], a, b, c, d, e), type = "full", by = ID.Var) %>% # !Alert! join_all works only with package plyr not with dplyr
+    mutate(anyrefusal = ifelse(is.infinite(anyrefusal) | is.na(anyrefusal), ifelse(!is.na(anycontact), 0, NA), anyrefusal),
+           anyinterview = ifelse(is.infinite(anyinterview) | is.na(anyinterview), ifelse(!is.na(anycontact), 0, NA), anyinterview))
+  
+  all
+}
+
+
+####Function: Overall disposition codes ####
+
+DeriveDispositioncodes <- function(CFdat, final, codename = "finalcode",
+                                   last = c("attempt", "contact"), 
+                                   refpriority = c("limited", "full"), 
+                                   interview = c("interva.last", "interva.any", "interva"), 
+                                   defectcfpriority = c("yes", "no")){
+  
+  # Correct interva
+  if(final != TRUE){
+    CFdat$interva[with(CFdat, is.na(anyinterview) & interva != 4)] <- 5
+    CFdat$interva[with(CFdat, anyinterview==0 & (interva == 1 | interva ==2 | interva ==3))] <- 5
+  }
+  
+  # Determine which Result and Outcome when there was no interview to consider
+  if(last == "contact"){
+    last.resul <- CFdat$lastcontact.resul
+    last.outni <- CFdat$lastcontact.outni
+    last.outinval <- CFdat$lastcontact.outinval
+  } else if(last == "attempt"){
+    last.resul <- CFdat$lastattempt.resul
+    last.outni <- CFdat$lastattempt.outni
+    last.outinval <- CFdat$lastattempt.outinval
+  }
+  
+  # Recode outnib
+  # if(median(CFdat$essround == 5)){
+  #   last.outni <- ifelse(last.outni %in% 7:12, last.outni + 1, last.outni)
+  # }
+  
+  # Start with empty disposition code
+  code <- rep(NA, nrow(CFdat))
+  
+  # Derive code for cases without contact form if priority
+  if(defectcfpriority == "yes"){
+    code <- with(CFdat, ifelse(is.na(code) & is.na(lastattempt.resul), 0, code))   # Undefined (contact forms missing)
+  }
+  
+  # Derive interview codes
+  if(interview == "interva"){
+    code <- with(CFdat, ifelse(is.na(code) & interva == 1, 10, code))   # Complete and valid interview
+    code <- with(CFdat, ifelse(is.na(code) & interva == 2, 11, code))   # Partial interview
+  } else if(interview == "interva.any"){
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & anyinterview == 1, 10, code))   # Complete and valid interview
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & anyinterview == 2, 11, code))       # Partial interview
+  } else if(interview == "interva.last"){
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 1, 10, code))     # Complete and valid interview
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 2, 11, code))         # Partial interview
+  }
+  
+  # Derive non-interview codes from interva
+  code <- with(CFdat, ifelse(is.na(code) & interva == 3, 12, code))   # Invalid interview
+  code <- with(CFdat, ifelse(is.na(code) & interva == 4, 30, code))   # Refusal because of opt-out list
+  
+  # Derive non-interview codes from call history indicators
+  if(refpriority == "full"){
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 6, 8) & anyrefusal > 0, 30 + anyrefusal, code))   # Refusal of respondent/Refusal by proxy/Refusal, don't know if respondent
+  } else if(refpriority == "limited"){
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & ((last.outni == 2) | (last.outni %in% 3:4 & anyrefusal == 2)), 32, code))   # Refusal of respondent
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 3, 33, code))    # Refusal by proxy
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 4, 34, code))    # Refusal, don't know if respondent
+    
+    code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 6 & anyrefusal > 0, 30 + anyrefusal, code))      # Refusal of respondent/Refusal by proxy/Refusal, don't know if respondent
+  }
+  
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 1, 31, code))      # Broken appointment
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 5, 41, code))      # Respondent not available, away
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 6, 42, code))      # Respondent mentally/physical unable/ill/sick (short term)
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 7, 46, code))      # Respondent mentally/physical unable/ill/sick (long term)
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 8, 43, code))      # Respondent deceased
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 9, 51, code))      # Respondent moved out of country
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 10, 52, code))     # Respondent moved to unknown destination
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 11, 53, code))     # Respondent moved, still in country
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & last.outni == 12, 44, code))     # Language barrier
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul %in% c(3, 4, 5, 8) & (last.outni == 13 | last.outni == 99 | is.na(last.outni)), 45, code)) # Contact but no interview, other
+  
+  # Derive invalid address codes
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & last.outinval == 1, 61, code))                     # Derelict or demolished house
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & last.outinval == 2, 62, code))                     # Not yet built, not ready for occupation
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & last.outinval == 3, 63, code))                     # Not occupied
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & last.outinval == 4, 64, code))                     # Address not residential: business
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & last.outinval == 5, 65, code))                     # Address not residential: institution
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & last.outinval == 6, 54, code))                     # Address not traceable
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & last.resul == 7 & (last.outinval == 7 | last.outinval == 99 | is.na(last.outinval)), 67, code)) # Other ineligible
+  
+  # Derive noncontact codes
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & is.na(lastcontact.resul) & lastattempt.resul == 6, 20, code))   # Non-contact
+  
+  # Check remaining
+  # with(CFdat[is.na(code),], subset(as.data.frame(table(defectcf, interva, anycontact = addNA(anycontact), anyinterview = addNA(anyinterview), anyrefusal = addNA(anyrefusal), lastattempt.resul = addNA(lastattempt.resul), lastcontact.resul = addNA(lastcontact.resul))), Freq > 0))
+  
+  # Derive code for cases without contact form if no priority
+  code <- with(CFdat, ifelse(is.na(code) & is.na(lastattempt.resul), 0, code))                                                       # Undefined (contact forms missing) #FMS lastattempt.resul missing instead of defectcf == 2
+  
+  # Derive noncontact codes (2)
+  code <- with(CFdat, ifelse(is.na(code) & interva == 5 & is.na(lastcontact.resul) & (is.na(anycontact) | anycontact == 0), 20, code))   # Non-contact
+  
+  # Derive Undefined code for remaining cases
+  code <- ifelse(is.na(code), 88, code)                                                                                   # Undefined (other)
+  
+  code
+}
+
+
+#### Function: Overall, aggregated disposition codes ####
+
+AggregateDispositioncodes <- function(CFdat, codename = "finalcode"){
+  finalcode <- unlist(CFdat[codename])
+  
+  code.aggr <- ifelse(finalcode == 10, "INT",
+                      ifelse(finalcode == 20, "NC",
+                             ifelse(finalcode %in% c(30, 32, 33, 34), "REF",
+                                    ifelse(finalcode %in% c(11, 12, 31, 41, 42, 44, 45, 46, 52, 53, 54), "OTH",
+                                           ifelse(finalcode %in% c(43, 51, 61, 62, 63, 64, 65, 67), "INELIG",
+                                                  ifelse(finalcode %in% c(0, 88), "UND", NA))))))
+  
+  code.aggr
+}
+
+```
+
+```{r DeriveOutcomes, error=T}
+# Apply indicators to data
+CHoutcomes <- DeriveCAindicators(CF, CF.CA.LONG)
+# Adjust to numeric
+CHoutcomes <- data.frame(lapply(CHoutcomes, function(x) as.numeric(as.character(x))))
+
+# Add indicators to CF
+CF <- merge(CF, CHoutcomes, by = ID.Var, all.x = TRUE)
+
+# Calculate Outcome Codes
+CF$finalcode <- DeriveDispositioncodes(CF, final = TRUE, last = "contact", refpriority = "full", interview = "interva.any", defectcfpriority = "no")
+CF$finalcodeaggregated <- AggregateDispositioncodes(CF, codename = "finalcode")
+
+#Alert! Outcomes for reissue variables left out of for the current version
+#Alert! Defectcf varaible not accounted for
+
+```
+
+```{r CompleteIndicators, error=T}
+##### Complete Main Indicators #####
+
+# only personal visits
+CF.CA.LONG.personal <- subset(CF.CA.LONG, modev2 == "Personal visit")
+
+# Check if numtel and numtela are in FMS dataset, otherwise set to NA
+CF$numtel <- ifelse("numtel" %in% names(CF), CF$numtel, NA)
+CF$numtela <- ifelse("numtela" %in% names(CF), CF$numtel, NA)
+
+#### Main Indicators #####
+
+# read CF mainindicators data 
+CF_main <- CF[,c("cntry", "idno", "finalcode", "finalcodeaggregated",
+                 "numtel", "numtela",
+                 "anyrefusal")]
+
+## Change variables
+# anyrefusal
+CF_main <- CF_main %>%
+  mutate(anyrefusal = na_if(anyrefusal, 0))
+
+# finalcodeaggregated
+CF_main <- CF_main %>%
+  dplyr::mutate(finalcodeaggregated=dplyr::recode(finalcodeaggregated,
+                                                  "INT" = "Complete and valid interview",
+                                                  "NC" = "No contact",
+                                                  "REF" = "Refusal",
+                                                  "OTH" = "Not able and other nonresponse",
+                                                  "INELIG" = "Ineligible",
+                                                  "UND" = "Undefined"))
+# numtel & numtela
+CF_main <- CF_main %>%
+  mutate(numtel = na_if(numtel, 666)) %>%
+  mutate(numtela = na_if(numtela, 666))
+
+
+##add variables##
+# Country
+CF_main <- left_join(CF_main, Country, by= c("cntry"))
+CF_main <- select(CF_main, -c(CountryName))
+
+# Final contact status
+a <- aggregate(contactstatus ~ cntry + idno, CF.CA.LONG, FUN = max, na.rm = T)
+CF_main <- merge(CF_main, a, by = c("cntry", "idno"), all.x = T)
+CF_main$contactstatus[with(CF_main, is.na(contactstatus) & finalcode == 20)] <- 0
+CF_main$contactstatus <- with(CF_main, ifelse(finalcode == 20 & contactstatus == 0, "Final Non-contact, no contact at all",
+                                              ifelse(finalcode == 20 & contactstatus %in% 1:2, "Final Non-contact, although some contact",
+                                                     ifelse(finalcode %in% c(52, 53), "Moved (not abroad)",
+                                                            ifelse(finalcodeaggregated == "Ineligible", "Ineligible",
+                                                                   ifelse(finalcodeaggregated == "Undefined", "Undefined", "Other"))))))
+# nattemptstocontact
+a <- aggregate(attempt ~ cntry + idno, data = subset(CF.CA.LONG, attempt <= attemptfirstcontact), FUN = length)
+a <- plyr::rename(a, c("attempt" = "nattemptstocontact"))
+CF_main <- merge(CF_main, a, by = c("cntry", "idno"), all.x = T)
+CF_main$nattemptstocontact <- with(CF_main, ifelse(!is.na(numtel) & numtel != 999, nattemptstocontact + numtel, nattemptstocontact))
+CF_main$nattemptstocontact <- with(CF_main, ifelse(finalcodeaggregated %in% c("Undefined", "Ineligible"), NA, nattemptstocontact))
+
+# contactstatus.firstattempt
+a <- subset(CF.CA.LONG, firstattempt == "First attempt")
+a <- plyr::rename(a, c("contactstatus" = "contactstatus.firstattempt"))
+CF_main <- merge(CF_main, a[,c("cntry", "idno", "contactstatus.firstattempt")], by = c("cntry", "idno"), all.x = T)
+CF_main$contactstatus.firstattempt <- with(CF_main, ifelse(!is.na(numtel) & !numtel %in% c(0, 999), 0, contactstatus.firstattempt))
+CF_main$contactstatus.firstattempt <- with(CF_main, ifelse(finalcodeaggregated %in% c("Ineligible", "Undefined"), NA, contactstatus.firstattempt))
+
+# first contact attempt mode: personal visit/telephone/other
+a <- subset(CF.CA.LONG, firstattempt == "First attempt")
+a <- plyr::rename(a, c("modev2" = "modev2.firstattempt"))
+CF_main <- merge(CF_main, a[,c("cntry", "idno", "modev2.firstattempt")], by = c("cntry", "idno"), all.x = T)
+CF_main$modev2.firstattempt[CF_main$numtel > 0] <- "Telephone"
+
+# first contact mode: personal visit/telephone/other and result
+b <- subset(CF.CA.LONG, resul %in% 1:5)
+b <- subset(b, attempt == with(b, ave(attempt, cntry, idno, FUN = min)))
+b <- plyr::rename(b, c("modev2" = "modev2.firstcontact"))
+b$resulb2.firstcontact <- with(b, ifelse(resul %in% 1:2, "Interview",
+                                         ifelse(outni == 1, "Appointment",
+                                                ifelse(outni %in% 2:4, "Refusal", "Other"))))
+CF_main <- merge(CF_main, b[,c("cntry", "idno", "modev2.firstcontact", "resulb2.firstcontact")], by = c("cntry", "idno"), all.x = T)
+
+
+# number of attempts
+a <- with(CF.CA.LONG, data.frame(table(cntry, idno)))
+a <- plyr::rename(a, c("Freq" = "nattempts"))
+CF_main <- merge(CF_main, a, by = c( "cntry", "idno"), all.x = T)
+CF_main$nattempts[is.na(CF_main$nattempts)] <- 0
+
+# Number of personal visits
+a <- with(CF.CA.LONG.personal, data.frame(table(cntry, idno)))
+a <- plyr::rename(a, c("Freq" = "nvisits"))
+CF_main <- merge(CF_main, a, by = c( "cntry", "idno"), all.x = T)
+CF_main$nvisits[is.na(CF_main$nvisits)] <- 0
+
+#### # Reason for Refusal #####
+# 
+# # R10 !Alert! changes of refvis to refca (no content change?) & rersb to rersc (added refusal to allow in home due to health)
+# nref <- max(unique(na.omit(as.numeric(unlist(strsplit(names(CF)[names(CF) %in% paste0("refca", 1:2^8)], "[^0-9]+"))))))
+# nrefreason <- max(unique(na.omit(as.numeric(unlist(strsplit(names(CF)[names(CF) %in% paste0("rersc1_", 1:2^8)], "[^0-9]+"))))))
+# 
+# rersc = as.list(as.data.frame(matrix(paste0("rersc", apply(expand.grid(1:nref, 1:nrefreason), 1, function(x) paste(x[1], x[2], sep = "_"))),
+#                                      ncol = nrefreason, nrow = nref),
+#                               stringsAsFactors = F))
+# # Add reasons for refusal indicators (mentioned at least once)
+# CF_main$refreason1 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 1) > 0)
+# CF_main$refreason2 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 2) > 0)
+# CF_main$refreason3 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 3) > 0)
+# CF_main$refreason4 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 4) > 0)
+# CF_main$refreason5 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 5) > 0)
+# CF_main$refreason6 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 6) > 0)
+# CF_main$refreason7 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 7) > 0)
+# CF_main$refreason8 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 8) > 0)
+# CF_main$refreason9 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 9) > 0)
+# CF_main$refreason10 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 10) > 0)
+# CF_main$refreason11 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 11) > 0)
+# CF_main$refreason12 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 12) > 0)
+# CF_main$refreason13 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 13) > 0)
+# CF_main$refreason14 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 14) > 0)
+# CF_main$refreason15 <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(x[!is.na(x)] == 15) > 0)
+# CF_main$norefreason <- apply(CF[unlist(rersc)], 1, FUN = function(x) sum(!is.na(x) & x != 99) == 0)
+# #with(CF_main, table(addNA(anyrefusal), addNA(finalcode))) <- check only?
+
+
+### Alert! Main indicator: Weekend and evening, and spread missing - cause timeCat, weekdayCat, and fulldate missing (see DataPrep2)
+```
+
+```{r DataPrepIwer, error=T}
+### Establish interviewer with last contact attempt as ref for rates and assignment/reissuing stage, attempts, mode###
+#FMS intnum is lastattempt.intnum
+
+# 
+# DeriveIwer <- function(CF, CA.LONG){
+#   # Order attempts
+#   CA.LONG <- CA.LONG[with(CA.LONG, order(idno, attempt)),]
+# 
+#   #Simplified selection for CF fieldwork data (applies to R9 and R10)
+#   CA.LONG1 <- subset(CA.LONG, !(resul == 99 & (is.na(outni) | (!is.na(outni) & outni == 99))
+#   ))
+#   
+#   # Last iwer, assigment, nattempts
+#   a <- subset(CA.LONG1, !duplicated(CA.LONG1[ID.Var], fromLast = TRUE))[c(ID.Var, "intnum", "assignment", "attempt", "modev2")] %>%
+#     plyr::rename(c("intnum" = "lastattempt.intnum", 
+#                    "assignment" = "lastattempt.assignment",
+#                    "attempt" = "nlastattempt",
+#                    "modev2" = "lastattempt.mode"))
+#   
+#   # Merge
+#   all <- plyr::join_all(list(CF[ID.Var], a), type = "full", by = ID.Var) # !Alert! join_all works only with package plyr not with dplyr
+#   
+#   all
+# }
+# # Derive and merge
+# CAlastiwer <- DeriveIwer(CF, CF.CA.LONG)
+# CF <- merge(CF, CAlastiwer, by = ID.Var, all.x = TRUE)
+# 
+# CAlastiwer <- DeriveIwer(CF, CF.CA.LONG)
+# CF_main <- merge(CF_main, CAlastiwer, by = ID.Var, all.x = TRUE)
+
+CF$lastattempt.intnum <- CF$intnum
+CF_main <- left_join(CF_main, select(CF, c("cntry", "idno", "lastattempt.intnum")), by = c("cntry", "idno"))
+
+```
+
+## Outcome breakdown {#sec:outcomebreakdown}
+
+This section provides a breakdown of the outcome code distribution calculated using the most recent ESS algorithm for the final outcome code. The algorithm applies the following principles for calculating the outcome codes:
+
+1.    The outcome code is derived from the code of the last contact with the sample unit (or the last attempt at which the validity of the sample unit is determined or other relevant information on the case is gained).
+
+2.    If no contact is made with the sample unit, the outcome code is ‘Non-contact’.
+
+3.    If a refusal occurred and no interview is subsequently administered, the outcome code is ‘Refusal by respondent’, ‘Refusal by proxy’ or ‘Household refusal’ (in that specific order), irrespective of the code of the last (eligible) contact.
+
+4.    If an interview occurred at any contact attempt,  the outcome code is ‘Valid interview’ regardless of the outcome of any further contact attempts.
+
+Furthermore, the algorithm applied to the FMS has been slightly modified to only considers information from the contact attempts. Therefore, this adapted version of the algorithm prioritises information from the survey administration office over the information provided by interviewers. So, for example, if a sample unit has been incorrectly recorded as a refusal by the interviewer in the contact forms, but it was actually an interview, we would not be able to detect this change unless data on the contact attempts are corrected. The same applies to the invalidation of interviews by the survey agency, which are not reflected as a contact attempt, but instead recorded as an outcome but the survey agency or the Archive. This could result in slight variations of the outcome distribution using the final outcome codes after data deposit.
+
+From the `r length(CF_main$idno)` cases in the file from `r thisCountry`, a total of  `r length(!is.na(CF_main$finalcode))` cases had some contact information available that that allowed to calculate their outcome code. 
+
+Table \ref{tab:Outcomebreakdown_tab} shows the distribution of the outcome codes for `r thisCountry` based on the data uploaded to the FMS. These are grouped within their respective classification used for the calculation of the outcome rates in the ESS.
+
+
+```{r OutcomeTable, error=T}
+
+#Outcome variables only
+CF_outcome <- CF_main[,c("cntry", "Country", "idno", "finalcode", "finalcodeaggregated", 
+                         "contactstatus", "numtel", "numtela", "modev2.firstattempt",
+                         "nattemptstocontact", "contactstatus.firstattempt", "nattempts", "nvisits",
+                         "modev2.firstcontact", "resulb2.firstcontact",
+                         "anyrefusal")] #paste0("refreason",1:14), "norefreason" Reasons for refusal removed for now
+
+# Information on all final codes
+allfinalcodes <- read.csv2("Final codes.csv", dec = ".", stringsAsFactors = F) # !Alert! check if codes have changed
+
+## Helpers to avoid missing finalcodes#
+
+### Country
+# vector with all countries
+cntries <- unique(CF_outcome$cntry)
+### Finalcodes
+# how many countries x are included?
+count_countries <- length(unique(CF_outcome$cntry))
+# how many finalcodes y are included?
+count_finalcode <- length(unique(allfinalcodes$code))
+# repeat each country y times
+Country_finalcode <- rep(cntries, each=count_finalcode)
+Country_finalcode <- as.data.frame(Country_finalcode)
+Country_finalcode <-  dplyr::rename(Country_finalcode, Country=Country_finalcode)
+# repeat allcodes x-times
+allcodes <- allfinalcodes %>% slice(rep(row_number(), count_countries))
+# merge countries to codes
+allcodes <- bind_cols(allcodes, Country_finalcode)
+### Finalcodesaggregated
+# how many finalcodeaggregated z are included?
+count_aggregated <- length(unique(allfinalcodes$aggregated))
+# repeat each country z times
+Country_aggregated <- rep(cntries, each=count_aggregated)
+Country_aggregated <- as.data.frame(Country_aggregated)
+Country_aggregated <-  dplyr::rename(Country_aggregated, Country=Country_aggregated)
+#repeat allcodesaggregated z-times
+allcodesaggregated <- as.data.frame(unique(allfinalcodes$aggregated))
+allcodesaggregated <- allcodesaggregated %>%
+  dplyr::rename(code=`unique(allfinalcodes$aggregated)`) %>%
+  arrange(code) %>%
+  slice(rep(row_number(), count_countries))
+allcodesaggregated <- bind_cols(allcodesaggregated, Country_aggregated)
+### Contacstatus
+# how many codes for contactstatus w are included?
+count_contactstatus <- length(unique(na.omit(CF_outcome$contactstatus)))
+# repeat each country w times
+Country_contactstatus <- rep(cntries, each=count_contactstatus)
+Country_contactstatus <- as.data.frame(Country_contactstatus)
+Country_contactstatus <-  dplyr::rename(Country_contactstatus, Country=Country_contactstatus)
+# repeat allcontactstatus w-times
+allcodescontactstatus <- as.data.frame(unique(na.omit(CF_outcome$contactstatus)))
+allcodescontactstatus <- allcodescontactstatus %>%
+  dplyr::rename(code=`unique(na.omit(CF_outcome$contactstatus))`) %>%
+  arrange(code) %>%
+  slice(rep(row_number(), count_countries))
+allcodescontactstatus <- bind_cols(allcodescontactstatus, Country_contactstatus)
+
+## finalcode##
+CF_outcome_finalcode_n <- CF_outcome %>% 
+  dplyr::group_by(cntry) %>% 
+  dplyr::count(finalcode) %>%
+  dplyr::rename(Freq=n, Country=cntry, code=finalcode) %>%
+  dplyr::right_join(allcodes,CF_outcome,by=c("Country","code")) %>%
+  dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
+  dplyr::mutate(code=as.character(code)) %>%
+  dplyr::mutate(classification="finalcode", type="n") 
+
+CF_outcome_finalcode_prob <- CF_outcome %>% 
+  dplyr::group_by(cntry) %>% 
+  dplyr::count(finalcode) %>%
+  dplyr::mutate(Freq = prop.table(n)) %>%
+  dplyr::select(-n) %>%
+  dplyr::rename(Country=cntry, code=finalcode) %>%
+  dplyr::right_join(allcodes,CF_outcome,by=c("Country","code")) %>%
+  dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
+  dplyr::mutate(code=as.character(code)) %>%
+  dplyr::mutate(classification="finalcode", type="prop") 
+
+# finalcodeaggregated #
+
+CF_outcome_finalcodeaggregated_n <- CF_outcome %>% 
+  dplyr::group_by(cntry) %>% 
+  dplyr::count(finalcodeaggregated) %>%
+  dplyr::rename(Freq=n, Country=cntry, code=finalcodeaggregated) %>%
+  dplyr::right_join(allcodesaggregated,CF_outcome,by=c("Country","code")) %>%
+  dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
+  dplyr::mutate(code=as.character(code)) %>%
+  dplyr::mutate(classification="finalcodeaggregated", type="n") 
+
+CF_outcome_finalcodeaggregated_prop <- CF_outcome %>% 
+  dplyr::group_by(cntry) %>% 
+  dplyr::count(finalcodeaggregated) %>%
+  dplyr::mutate(Freq = prop.table(n)) %>%
+  dplyr::select(-n) %>%
+  dplyr::rename(Country=cntry, code=finalcodeaggregated) %>%
+  dplyr::right_join(allcodesaggregated,CF_outcome,by=c("Country","code")) %>%
+  dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
+  dplyr::mutate(code=as.character(code)) %>%
+  dplyr::mutate(classification="finalcodeaggregated", type="prop") 
+
+## contactstatus ##
+
+CF_outcome_contactstatus_prop <- CF_outcome %>%
+  dplyr::group_by(cntry) %>%
+  dplyr::count(contactstatus) %>%
+  dplyr::mutate(Freq = prop.table(n)) %>%
+  dplyr::select(-n) %>%
+  dplyr::rename(Country=cntry, code=contactstatus) %>%
+  dplyr::right_join(allcodescontactstatus,CF_outcome,by=c("Country","code")) %>%
+  dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
+  dplyr::mutate(code=as.character(code)) %>%
+  dplyr::mutate(classification="contactstatus", type="prop") 
+
+CF_outcome_finalcodeaggregatedcondcont_prop <- CF_outcome %>%
+  filter(finalcodeaggregated == "Complete and valid interview" | finalcodeaggregated == "Not able and other nonresponse" | finalcodeaggregated == "Refusal") %>%
+  dplyr::group_by(cntry) %>%
+  dplyr::count(finalcodeaggregated) %>%
+  dplyr::mutate(Freq = prop.table(n)) %>%
+  dplyr::select(-n) %>%
+  dplyr::rename(Country=cntry, code=finalcodeaggregated) %>%
+  dplyr::mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>%
+  dplyr::mutate(code=as.character(code)) %>%
+  dplyr::mutate(classification="finalcodeaggregatedcondcont", type="prop")
+
+## Combine cases   ###
+
+CF_outcome_breakdown <- dplyr::union_all(CF_outcome_finalcode_n, CF_outcome_finalcode_prob) %>%
+  dplyr::union_all(., CF_outcome_finalcodeaggregated_n) %>%
+  dplyr::union_all(., CF_outcome_finalcodeaggregated_prop) %>%
+  dplyr::union_all(., CF_outcome_contactstatus_prop)%>%
+  dplyr::union_all(., CF_outcome_finalcodeaggregatedcondcont_prop)%>%
+  arrange(classification,type,code,Country)
+
+
+# add country names to dataset ##
+CF_outcome_breakdown <- left_join(CF_outcome_breakdown, Country, by = c("Country"="cntry")  , all = TRUE, sort = FALSE)
+CF_outcome_breakdown <- CF_outcome_breakdown %>%
+  ungroup() %>%
+  select(-c(Country, CountryName)) %>%
+  dplyr::rename(Country=Country.y)
+
+
+```
+
+```{r Outcomebreakdown_tab, results = "asis", error=T}
+
+OutcomeCodes <- CF_outcome_breakdown[,c("code", "Country", "Freq", "classification", "type", "label", "aggregated", "NTS")]
+
+## Outcome breakdown table
+temp <- merge(reshape2::dcast(subset(OutcomeCodes, classification == "finalcode"), code ~ type, # !Alert! change country
+                              value.var = "Freq") %>%
+                mutate(code = as.numeric(as.character(code))), 
+              allfinalcodes, by = "code", all.y = T) %>%
+  mutate(aggregated = factor(aggregated, levels = c("Complete and valid interview",
+                                                    "No contact",
+                                                    "Refusal",
+                                                    "Not able and other nonresponse",
+                                                    "Ineligible",
+                                                    "Undefined")))
+#temp$n[is.na(temp$n)] <- 0
+#temp$prop[is.na(temp$prop)] <- 0
+temp <- temp[order(temp$aggregated),]
+temp <- temp[,c("code", "label", "n", "prop")]
+temp$code <- with(temp, as.character(code))
+
+kable(rbind(temp, sumrow(temp)) %>% mutate(prop = formattable::percent(prop)), # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      col.names = c("", "", "n", "%"), 
+      caption = paste("\\label{tab:Outcomebreakdown_tab} Detailed breakdown of current FMS response outcomes,",
+                      thisCountry))  %>% # !Alert! change country
+  kable_styling(latex_options = c("HOLD_position")) %>%
+  column_spec(2, width = "9cm")  %>%
+  kableExtra::group_rows(index = c("Complete and valid interview" = 1, "No contact" = 1, "Refusal" = 4, "Not able and other nonresponse" = 11, "Ineligible" = 8, "Undefined" = 2, "Total sample units" = 1)) 
+#%>%
+#footnote(general = FMS)
+
+```
+
+\newpage
+
+## Overview of outcome rates {#sec:overviewrates}
+
+The outcome rates are calculated based on the outcome code presented in the previous section. Table \ref{tab:rates_tab} shows the outcome rates, the definition for how they are calculated and the reference to their equivalent in the AAPOR Standards [@aapor2016].  
+
+```{r rates, results = "asis", error=T}
+
+#Calculate rates
+NGROSS <- as.numeric(nrow(CF_main))
+OutcomeAggregated <- with(CF_main, data.frame(table(finalcodeaggregated)))
+INT <- as.numeric(nrow(CF_main[CF_main$finalcodeaggregated == "Complete and valid interview",]))
+INELIG <- as.numeric(nrow(CF_main[CF_main$finalcodeaggregated == "Ineligible",]))
+NC <- as.numeric(nrow(CF_main[CF_main$finalcodeaggregated == "No contact",]))
+REF <- as.numeric(nrow(CF_main[CF_main$finalcodeaggregated == "Refusal",]))
+INTPREF <- INT + REF + as.numeric(nrow(CF_main[CF_main$finalcode == 11,]))
+
+rr <- r1(INT,NGROSS,INELIG)
+ri <- r2(INELIG, NGROSS)
+refr <- r1(REF, NGROSS, INELIG)
+coopr <- r2(INT, INTPREF)
+ncr <- r1(NC, NGROSS, INELIG)
+
+
+#Create table for rates
+a <- c("Response Rate", 
+       "Refusal Rate", 
+       "Cooperation Rate", 
+       "Non-Contact Rate", 
+       "Rate of Ineligibles")
+
+b <- c("rr", 
+       "refr", 
+       "coopr", 
+       "nonr", 
+       "ri")
+
+c <- c(rr,refr,coopr,ncr,ri)
+
+d <- c("Interviews / (Gross sample - Ineligibles)", 
+       "Refusals / (Gross sample - Ineligibles)", 
+       "Interviews / (Interviews + Partial Interviews + Refusals)", 
+       "Non-contacts / (Gross sample - Ineligibles)", 
+       "Ineligibles / Gross sample")
+
+e <- c("RR1", 
+       "REF1", 
+       "COOP3", 
+       "1 - CON1", 
+       ".")
+
+rates <- data.frame(a,c,d,e) %>% 
+  dplyr::rename(rates = a,
+                value = c,
+                definitions = d,
+                AAPOR_Standard = e)
+#Plot
+kable(rates,
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:rates_tab} Outcome rates,", thisCountry))  %>% 
+  kable_styling(latex_options = c("HOLD_position")) %>%
+  column_spec(3, width = "10em")
+  
+
+```
+
+
+## Contacting sample units {#sec:contacting}
+
+Figure \ref{fig:nca_plot} shows how many contacts attempts have been made to the sample units so far. Figure \ref{fig:npv_plot} focused on only on personal visits made to the sample units
+
+```{r ca, error=T}
+
+ncainfo <- as.numeric(count(!is.na(CF_main$attempts)))
+
+```
+
+
+```{r nca_plot, fig.width = 7, fig.cap = paste("\\label{fig:nca_plot} Contact attempts to sample units"), fig.scap="Contact attempts to sample units", error=T}
+
+## Cases plot
+ggplot(CF_main %>% 
+         mutate(nattempts), 
+       aes(x = nattempts, fill = nattempts < 1)) +
+  geom_bar(col = "white") +
+  scale_x_continuous(name = "Number of contact attempts", breaks = seq(0, max(CF_main$nattempts), 1)) +
+  scale_y_continuous(name = "Sample units") +
+  expand_limits(x = c(0, max(CF_main$nattempts))) +
+  scale_fill_manual(values = c("FALSE" =  ESSColors[8], 
+                               "TRUE" = "gray")) +
+  themeESS
+
+```
+
+
+```{r npv_plot, fig.width = 7, fig.cap = paste("\\label{fig:npv_plot} Personal visits to sample units"), fig.scap="Personal visits to sample units", error=T}
+
+## Cases plot
+ggplot(CF_main %>% 
+         mutate(nvisits), 
+       aes(x = nvisits, fill = nvisits < 1)) +
+  geom_bar(col = "white") +
+  scale_x_continuous(name = "Number of personal visits", breaks = seq(0, max(CF_main$nvisits), 1)) +
+  scale_y_continuous(name = "Sample units") +
+  expand_limits(x = c(0, max(CF_main$nvisits))) +
+  scale_fill_manual(values = c("FALSE" =  ESSColors[8], 
+                               "TRUE" = "gray")) +
+  themeESS
+
+```
+
+
+## Mode of contact attempts {#sec:modeca}
+
+Observing the mode of contact attempts helps understand how fieldwork activities are being conducted and allow checking compliance with the ESS Specification.
+Figure \ref{fig:modeca_plot} provides an overview of the mode for all contact attempts made so far in `r thisCountry`.
+
+Figure \ref{fig:mode1ca_plot} shows in which mode the first contact attempts to the sample units was made. In most countries, the first contact attempt should be made in person. But it may vary depending on the sample frame and agreement with the CST.
+
+Lastly, figure \ref{fig:mode1contact_plot} presents the mode in which the first actual contact with the sample units was achieved (RESULB values 1 to 5). It can be regarded as the mode of recruitment to participate in the survey (i.e. mode of the first actual attempt to gain cooperation from the sample unit).
+
+
+```{r modeca, error=T}
+
+modeca <- with(CF.CA.LONG, data.frame(prop.table(table(modev2))))
+nmodeca <- as.numeric(count(!is.na(CF.CA.LONG$modev2)))
+
+mode1ca <- with(CF_main, data.frame(prop.table(table(modev2.firstattempt))))
+nmode1ca <- as.numeric(count(!is.na(CF_main$modev2.firstattempt)))
+
+mode1contact <- with(CF_main, data.frame(prop.table(table(modev2.firstcontact))))
+nmode1contact <- as.numeric(count(!is.na(CF_main$modev2.firstcontact)))
+
+```
+
+
+```{r modeca_plot, fig.width = 7, fig.height = 1.5, fig.cap = paste("\\label{fig:modeca_plot} Mode of contact attempts", linebreak, "Note:", "n =", nmodeca), fig.scap="Mode of contact attempts", error=T}
+
+## Cases plot
+ggplot(modeca,aes(x = 1, y = Freq, fill = modev2)) +
+  geom_bar(stat = "identity", col = "white") +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1), labels = scales::percent) +
+  themeESS +
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_line(),
+        legend.position = "bottom",
+        legend.direction = "vertical")
+
+```
+
+```{r mode1ca_plot, fig.width = 7, fig.height = 1.5, fig.cap = paste("\\label{fig:mode1ca_plot} Mode of first contact attempt to each sample unit", linebreak, "Note:", "n =", nmode1ca), fig.scap="Mode of first contact attempt to each sample unit", error=T}
+
+## Cases plot
+ggplot(mode1ca,aes(x = 1, y = Freq, fill = modev2.firstattempt)) +
+  geom_bar(stat = "identity", col = "white") +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1), labels = scales::percent) +
+  themeESS +
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_line(),
+        legend.position = "bottom",
+        legend.direction = "vertical")
+
+```
+
+
+```{r mode1contact_plot, fig.width = 7, fig.height = 1.5, fig.cap = paste("\\label{fig:mode1contact_plot} Mode of recruitment (first actual contact with sample unit)", linebreak, "Note:", "n =", nmode1contact), fig.scap="Mode of recruitment (first actual contact with sample unit)", error=T}
+
+## Cases plot
+ggplot(mode1contact,aes(x = 1, y = Freq, fill = modev2.firstcontact)) +
+  geom_bar(stat = "identity", col = "white") +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1), labels = scales::percent) +
+  themeESS +
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_line(),
+        legend.position = "bottom",
+        legend.direction = "vertical")
+
+```
+
+## Non-contacts {#sec:nnonc}
+
+The ESS Specifications indicate that sample units need to be visited at least four times in person before can be abandoned as ‘non‐productive.’ Personal visits are even more relevant if no contact at all has been achieved with the sample unit yet (the definition of non‐contacts in the ESS algorithm for outcome codes). Investing the necessary effort in contacting sample units is fundamental for achieving the best results in the field.
+
+Figure \ref{fig:pv2nc_plot} shows the number of personal visits conducted to cases currently considered as non‐ contacts. Non‐contacts with less than 4 personal are shown in grey. To provide a broader view of the contacting efforts made to non‐contacts so far, figure \ref{fig:ca2nc_plot} shows the distribution of non-contacts based on the number of contact attempts made to them.
+
+
+```{r ca2nc, error=T}
+nnc <- as.numeric(count(CF$finalcode== 20))
+```
+
+
+```{r pv2nc_plot, fig.width = 7, fig.cap = paste("\\label{fig:pv2nc_plot} Personal visits to non-contacts",  linebreak, "Note:", "n =", nnc), fig.scap="Personal visits to non-contacts", error=T}
+
+## Cases plot
+ggplot(subset(CF_main, finalcode == 20) %>% 
+         mutate(nvisits), 
+       aes(x = nvisits, fill = nvisits >= 4)) +
+  geom_bar(col = "white") +
+  scale_x_continuous(name = "Number of personal visits", breaks = seq(0, max(CF_main$nvisits), 1)) +
+  scale_y_continuous(name = "Number of non-contacts") +
+  expand_limits(x = c(0, max(CF_main$nvisits))) +
+  scale_fill_manual(values = c("FALSE" = "grey", 
+                               "TRUE" = ESSColors[8])) +
+  themeESS
+
+```
+
+
+```{r ca2nc_plot, fig.width = 7, fig.cap = paste("\\label{fig:ca2nc_plot} Contact attempts to non-contacts",  linebreak, "Note:", "n =", nnc), fig.scap="Contact attempts  to non-contacts", error=T}
+
+## Cases plot
+ggplot(subset(CF_main, finalcode == 20) %>% 
+         mutate(nattempts), 
+       aes(x = nattempts)) +
+  geom_bar(col = "white") +
+  scale_x_continuous(name = "Number of contact attempts", breaks = seq(0, max(CF_main$nattempts), 1)) +
+  scale_y_continuous(name = "Number of non-contacts") +
+  expand_limits(x = c(0, max(CF_main$nattempts))) +
+  themeESS
+
+```
+
+
+```{r assignstage, error=T}
+
+#Removed! Assignment not possible as FMS app does not include full record of intnum for each contact attempt !Alert
+# assignmentstages <- as.data.frame(prop.table(table(CF$lastattempt.assignment)))
+# nassigned <- as.numeric(count(!is.na(CF$lastattempt.assignment)))
+
+```
+
+
+```{r assignstage_plot, fig.width = 7, fig.height = 1.5, fig.cap = paste("\\label{fig:assignstage_plot} Stage of (re)assignment of cases",  linebreak, "Note: changes of interviewer making contact attempts to sample units counts as a new assignment stage,"), fig.scap="Stage of (re)assignment of cases", error=T}
+
+## Cases plot
+# ggplot(assignmentstages,aes(x = 1, y = Freq, fill = Var1)) +
+#   geom_bar(stat = "identity", col = "white") +
+#   coord_flip() +
+#   scale_y_continuous(breaks = seq(0, 1, .1), limits = c(0, 1), labels = scales::percent) +
+#   themeESS +
+#   theme(axis.title = element_blank(),
+#         axis.text.y = element_blank(),
+#         axis.ticks.y = element_blank(),
+#         axis.line.x = element_line(),
+#         legend.position = "bottom",
+#         legend.direction = "vertical")
+
+```
+
+
+\newpage
+
+
+
+
+# Interviewer indicators {#sec:level1indicators}
+
+In this section, we look at indicators at the interviewer level. Due to the limitation of the information in the FMS, the indicators are based on the current assignment of cases. For this, we assume that the interviewer that conducted the last contact attempt to a sample unit is responsible for fieldwork activities related to the case. 
+
+We look at the distribution of cases currently assigned to interviewers, the contacting of cases, the response rate, the refusal rate per interviewer and the non-contacts per interviewer.
+
+```{r IwerIndicators1, error=T}
+
+#### Iwer Indicators based on Last Attempt - QI1 ####
+
+# N cases currently assigned to interviewers
+IwerCurrentWork <- aggregate(idno ~ cntry + lastattempt.intnum, FUN = function(x) length(unique(x)), 
+                             data = CF) %>% 
+  rename(ncurrentcases = idno)
+
+# N nonrespondents currently assigned to interviewers
+IwerCurrentNonResp <- aggregate(idno ~ cntry + lastattempt.intnum, FUN = function(x) length(unique(x)),
+                                data = filter(CF,
+                                              CF$finalcodeaggregated != "INT" & 
+                                                CF$finalcodeaggregated != "INELIG")) %>% 
+  rename(ncurrentnonresp = idno)
+
+# N noncontacts with less than 4 contact attempts
+
+CF_ncless4ca <- subset(CF_main, 
+                       CF_main$finalcode ==  20 &
+                         CF_main$nattempts < 4)
+a <- CF_ncless4ca %>% dplyr::group_by(lastattempt.intnum) %>%
+         dplyr::count(lastattempt.intnum) %>%
+         dplyr::rename("ncless4ca" = "n")
+b <- CF_main %>% dplyr::group_by(lastattempt.intnum) %>%
+         dplyr::count(lastattempt.intnum) %>%
+         dplyr::transmute(n = 0) %>%
+         dplyr::rename("ncless4ca" = "n") 
+ifelse(nrow(CF_ncless4ca)>0, 
+       IwerNCless4ca <- a, 
+       IwerNCless4ca <- b)
+
+# N noncontacts with less than 4 personal visits
+
+CF_ncless4pv <- subset(CF_main, 
+                       CF_main$finalcode ==  20 &
+                         CF_main$nvisits < 4)
+a <- CF_ncless4pv %>% dplyr::group_by(lastattempt.intnum) %>%
+         dplyr::count(lastattempt.intnum) %>%
+         dplyr::rename("ncless4pv" = "n")
+b <- CF_main %>% dplyr::group_by(lastattempt.intnum) %>%
+         dplyr::count(lastattempt.intnum) %>%
+         dplyr::transmute(n = 0) %>%
+         dplyr::rename("ncless4pv" = "n") 
+ifelse(nrow(CF_ncless4pv)>0, 
+       IwerNCless4pv <- a, 
+       IwerNCless4pv <- b)
+
+
+#Removed! due to FMS app limited intnum records
+# # N cases on which reissuing stage 
+# CF <- CF %>%
+#   dplyr::rename(assignmentstage = lastattempt.assignment)
+# IwerAssignment <- CF %>%
+#   dplyr::group_by(lastattempt.intnum) %>%
+#   dplyr::count(assignmentstage) %>%
+#   dplyr::group_by(assignmentstage) %>%
+#   tidyr::spread(assignmentstage, n, fill = 0, sep = "")
+# 
+# # N cases on each reissuing stage
+# Assignment <- aggregate(idno ~ cntry + assignmentstage, FUN = function(x) length(unique(x)), data = CF)
+# Assignment <- Assignment %>% dplyr::rename(ncases = idno)
+
+# Create empty dataset with varaibles
+finalcodes <- c("lastattempt.intnum", paste0("finalcode_",allcodes$code))
+helpt = data.frame(matrix(nrow = 0, ncol = length(finalcodes)))
+colnames(helpt) = finalcodes
+# Outcomes per interviewer
+IwerFinalcode <- CF %>%
+  dplyr::group_by(lastattempt.intnum) %>%
+  dplyr::count(finalcode) %>%
+  dplyr::group_by(finalcode) %>%
+  tidyr::spread(finalcode, n, fill = 0, sep = "_")
+IwerFinalcode <- right_join(helpt,IwerFinalcode)
+IwerFinalcode <- IwerFinalcode %>% mutate_all(~replace(., is.na(.), 0))
+
+aggrcodes <- c("lastattempt.intnum", "INT", "INELIG", "NC", "REF", "OTH", "UND")
+helpt = data.frame(matrix(nrow = 0, ncol = length(aggrcodes)))
+colnames(helpt) = aggrcodes
+IwerFinalcodeAggr <- CF %>%
+  dplyr::group_by(lastattempt.intnum) %>%
+  dplyr::count(finalcodeaggregated) %>%
+  dplyr::group_by(finalcodeaggregated) %>%
+  tidyr::spread(finalcodeaggregated, n, fill = 0) #Merge with iwerWL to substitute NGROSS with idno. 
+IwerFinalcodeAggr <- right_join(helpt,IwerFinalcodeAggr)
+IwerFinalcodeAggr <- IwerFinalcodeAggr %>% mutate_all(~replace(., is.na(.), 0))
+#IwerFinalcodeAggr$NGROSS <- rowSums(IwerFinalcodeAggr[,c("INELIG","INT","NC","OTH","REF")], na.rm=TRUE)
+IwerFinalcodeAggr <- full_join(IwerFinalcodeAggr, IwerCurrentWork
+                               [,c("lastattempt.intnum","ncurrentcases")]) %>% 
+  dplyr::rename(NGROSS = "ncurrentcases")
+IwerFinalcodeAggr$INTREF <- rowSums(IwerFinalcodeAggr[,c("INT","REF")], na.rm=TRUE)
+##Alternative including partial interviews
+#IwerFinalcodeAggr$partialint  <-  IwerFinalcode$11
+#IwerFinalcodeAggr$INTPREF <- IwerFinalcodeAggr$INTREF + IwerFinalcode$11
+IwerFinalcodeAggr <- IwerFinalcodeAggr %>%
+  dplyr::mutate(r1(INT,NGROSS,INELIG)) %>%
+  dplyr::mutate(r2(INELIG,NGROSS)) %>%
+  dplyr::mutate(r1(REF,NGROSS,INELIG)) %>%
+  dplyr::mutate(r2(INT,INTREF)) %>%
+  dplyr::mutate(r1(NC,NGROSS,INELIG)) %>%
+  dplyr::rename(rr = "r1(INT, NGROSS, INELIG)") %>%
+  dplyr::rename(ri = "r2(INELIG, NGROSS)") %>%
+  dplyr::rename(refr = "r1(REF, NGROSS, INELIG)") %>%
+  dplyr::rename(coopr = "r2(INT, INTREF)") %>%
+  dplyr::rename(ncr = "r1(NC, NGROSS, INELIG)")
+
+
+IwerQI1 <- full_join(IwerCurrentWork, IwerCurrentNonResp)
+IwerQI1 <- full_join(IwerQI1, IwerFinalcodeAggr)
+IwerQI1 <- full_join(IwerQI1, IwerFinalcode)
+#IwerQI1 <- full_join(IwerQI1, IwerAssignment) #Removed! due to FMS app limited intnum records
+IwerQI1 <- full_join(IwerQI1, IwerNCless4ca)
+IwerQI1$ncless4ca <- tidyr::replace_na(IwerQI1$ncless4ca,0)
+IwerQI1 <- full_join(IwerQI1, IwerNCless4pv)
+IwerQI1$ncless4pv <- tidyr::replace_na(IwerQI1$ncless4pv,0)
+
+
+```
+
+
+```{r IwerIndicators2, error=T}
+
+#### Iwer Indicators based on intnum and LONG CA - QI2 ####
+
+## Iwer Workload ##
+# Aggregate all cases
+WL <- aggregate(idno ~ cntry + intnum, FUN = function(x) length(unique(x)), data = CF.CA.LONG)
+WL <- rename(WL, workload = idno)
+# Impute zero workload if missing
+WL[is.na(WL)] <- 0
+# Remove "interviewers" with Not Available interviewer number (may include CATI center)
+WL <- subset(WL, intnum != 99999999)
+
+## Attempts per Iwer ##
+IwerCA <- aggregate(idno ~ cntry + intnum, FUN = function(x) length(x), data = CF.CA.LONG)
+IwerCA[is.na(IwerCA)] <- 0
+IwerCA <- subset(IwerCA, intnum != 99999999)
+IwerCA <- rename(IwerCA, nattempts = idno)
+
+#Rate of CA
+IwerQI2 <- full_join(WL, IwerCA)
+IwerQI2 <- IwerQI2  %>% 
+  dplyr::mutate(nattempts/workload)  %>% 
+  dplyr::rename(rateCA = "nattempts/workload")
+
+## Cases with at least one Personal Visits per Iwer
+IwerPV <- aggregate(idno ~ cntry + intnum, FUN = function(x) length(unique(x)), data = CF.CA.LONG.personal)
+IwerPV[is.na(IwerPV)] <- 0
+IwerPV <- subset(IwerPV, intnum != 99999999)
+IwerPV <- rename(IwerPV, ncases.personal = idno)
+
+## N Personal Visits per Iwer
+IwerPVn <- aggregate(idno ~ cntry + intnum, FUN = function(x) length(x), data = CF.CA.LONG.personal)
+IwerPVn[is.na(IwerPVn)] <- 0
+IwerPVn <- subset(IwerPVn, intnum != 99999999)
+IwerPVn <- rename(IwerPVn, npersonalvisits = idno)
+
+a <- full_join(IwerCA,IwerPV)
+IwerQI2 <- full_join(IwerQI2,a)
+IwerQI2 <- full_join(IwerQI2,IwerPVn)
+
+#Rate of personal visits (PV/workload)
+IwerQI2 <- IwerQI2  %>% 
+  dplyr::mutate(npersonalvisits/workload)  %>% 
+  dplyr::rename(ratepersonalvisits = "npersonalvisits/workload")
+
+```
+
+
+## Assigned cases per interviewer {#sec:assignediwer}
+
+Figure \ref{fig:iwerassigned_plot} shows the current assignment of cases (with at least one contact attempt) to interviewers. It provides an overview of how cases are distributed across the interviewer workforce. On its own, this indicator might not be very informative, but it helps contextualize other indicators (e.g. response rates). Furthermore, these cases with more than 48 cases assigned to them have been flagged for review by the national team and highlighted in the figure. The ESS Specifications limit the number of sample units of cases that interviewers can work on to a maximum of 48 cases. Officially, an interviewer's workload is considered the sum of all sample units that have received at least one contact attempt. Therefore, one sample unit can add to the workload of two or more interviewers if more than one interviewer contacts this case. However, due to the limitation of the information in the FMS, the current workload is based on the assignment of cases, therefore, constituting a conservative estimation of the workload of the interviewer if the national team conducts reassignment of cases.
+
+Usually, the main concern about workload is the risks of interviewer effects introduced to the measurements in the main questionnaire, as a higher workload usually means more interviews. For example, how good interviews are conducted, and answer recorded, but also the influence interviewers have in the answers of respondents due to the ‘innate’ or ‘natural’ characteristic of the interviewers (age, gender, etc.); see section \ref{sec:rriwers} for response rate per interviewer. 
+However, interviewer effects also apply to the contacting and selection of respondents, making it possible to introduce bias and affect the sample's representativeness. for example which respondents interviewers convince to participate in the survey, which respondents they tend to contact depending on their individual contracting strategies, possible deviations from selection procedures, etc. Therefore, interviewers with very high workloads should be closely monitored, and the advantages of increasing workloads need to be weighed against the risks involved. 
+
+
+```{r iwerassigned, results = "asis", error=T}
+
+## Assigned cases per iwer
+#Descriptives#
+IwerQI1_ncasesdescr <- psych::describe(IwerQI1$ncurrentcases, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+IwerQI1_nnonrespdescr <- psych::describe(IwerQI1$ncurrentnonresp, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+# Flag deviation from Spec (48 max workload) based on current ncases
+IwerQI1 <- IwerQI1 %>%
+  dplyr::mutate(devwl=ifelse(ncurrentcases>48,as.numeric(ncurrentcases), NA)) %>%
+  mutate(intnum_devwl = lastattempt.intnum)
+IwerQI1$intnum_devwl[which(is.na(IwerQI1$devwl))] <- as.numeric(NA)
+IwerQI1$is_devwl <- ifelse(is.na(IwerQI1$devwl), "No", "Yes")
+
+kable(IwerQI1_ncasesdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for current assignment of cases per interviewer"))  %>% # !Alert! change country
+  kable_styling(latex_options = c("HOLD_position"))
+
+```
+
+```{r iwerassigned_plot,  fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:iwerassigned_plot} Assigned of cases per interviewer and workload",  linebreak, "Note: Assignment is based on interviewer who made last contact attempt or currently assigned in FMS. Interviewers with a workload higher than 48 are highlighted (based on current cases assgined)"), fig.scap="Assigned of cases per interviewer and workload", error=T}
+
+## Cases plot
+ggplot(IwerQI1,
+       aes(ncurrentcases, as.factor(lastattempt.intnum))) +
+  geom_point(aes(colour = IwerQI1$is_devwl)) +
+  labs(x = "Cases currently assigned",
+       y = "Interviewers",
+       color =  "Deviation from Specs (>48 cases max workload)") +
+  scale_colour_manual(values = c("No" = "black",
+                                  "Yes" = ESSColors[2])) +
+  theme(legend.position="bottom")
+
+
+```
+
+
+## Contact attempts per interviewer {#sec:caiwers}
+
+The number and the rate of contact attempts made by interviewers provide an idea of how active interviewers have been in the field. Figure \ref{fig:iwerca_plot} indicates the total number of contact attempts made by each interviewer to the sample units. To help contextualize the contact attempts with the potential of the assigned workload, figure \ref{fig:iwerrateca_plot} shows the rate of contact attempts per interviewer understood as the total number of contact attempts divided by the workload.
+
+```{r iwerca, results = "asis", error=T}
+
+## Number Contact attempts per iwer - based on contact attempts made to any case
+#Descriptives#
+IwerQI2_cadescr <- psych::describe(IwerQI2$nattempts, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+##Rate of attempts per iwer
+IwerQI2_ratecadescr <- psych::describe(IwerQI2$rateCA, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+kable(IwerQI2_ratecadescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for rates of contact attempts per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+```
+
+
+```{r iwerca_plot,  fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerca_plot} Number of contact attempts per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Number of contact attempts per interviewe", error=T}
+
+## Plot
+a <- ggplot(IwerQI2,
+       aes(nattempts, as.factor(intnum))) +
+  labs(x = "Number of contact attempts",
+       y = "Interviewers") +
+  geom_vline(xintercept = IwerQI2_cadescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI2_cadescr$mean + IwerQI2_cadescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI2_cadescr$mean + IwerQI2_cadescr$sd*-2)
+
+if(((IwerQI2_cadescr$mean + IwerQI2_cadescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+
+```{r iwerrateca_plot,  fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerrateca_plot} Rate of contact attempts per interviewer",  linebreak, "Note Number of contact attempts divided by the workload. Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Rate of contact attempts per interviewer", error=T}
+
+## Plot
+a <- ggplot(IwerQI2,
+       aes(rateCA, as.factor(intnum))) +
+  labs(x = "Rate of contact attempts",
+       y = "Interviewers") +
+  geom_vline(xintercept = IwerQI2_ratecadescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI2_ratecadescr$mean + IwerQI2_ratecadescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI2_ratecadescr$mean + IwerQI2_ratecadescr$sd*-2)
+
+if(((IwerQI2_ratecadescr$mean + IwerQI2_ratecadescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+## Personal visits per interviewer {#sec:pviwers}
+
+In contrast to the previous section,  this section limits the contact attempts to personal visits to observe the in-person activity of interviewers. Figure \ref{fig:iwerca_plot} shows the total number of personal visits conducted by each interviewer. Figure \ref{fig:iwerrateca_plot} shows the rate of personal visits per interviewer understood as the total number of personal visits divided by their workload.
+
+```{r iwerpv, results = "asis", error=T}
+
+## Number personal visits per iwer - based on visits made to any case
+#Descriptives#
+IwerQI2_pvdescr <- psych::describe(IwerQI2$nattempts, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+##Rate of personal visits per iwer
+IwerQI2_ratepvdescr <- psych::describe(IwerQI2$rateCA, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+
+kable(IwerQI2_pvdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for rate of personal visits per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+```
+
+
+```{r iwerpv_plot,  fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerpv_plot} Personal visits per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Personal visits per interviewer", error=T}
+
+## Plot
+a <- ggplot(IwerQI2,
+       aes(npersonalvisits, as.factor(intnum))) +
+  labs(x = "Number of personal visit",
+       y = "Interviewers") +
+  geom_vline(xintercept = IwerQI2_pvdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI2_pvdescr$mean + IwerQI2_pvdescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI2_pvdescr$mean + IwerQI2_pvdescr$sd*-2)
+
+if(((IwerQI2_pvdescr$mean + IwerQI2_pvdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+
+```{r iwerratepv_plot,  fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerratepv_plot} Rate of personal visits per Interviewer",  linebreak, "Note: Number of personal visits divided by the workload. Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Rate of personal visits per Interviewer", error=T}
+
+## Plot
+a <- ggplot(IwerQI2,
+       aes(ratepersonalvisits, as.factor(intnum))) +
+  labs(x = "Rate of personal visits",
+       y = "Interviewers") +
+  geom_vline(xintercept = IwerQI2_ratepvdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI2_ratepvdescr$mean + IwerQI2_ratepvdescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI2_ratepvdescr$mean + IwerQI2_ratepvdescr$sd*-2)
+
+if(((IwerQI2_ratepvdescr$mean + IwerQI2_ratepvdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+
+
+
+```{r iwerassigned_stage_plot,  fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:iwerassigned_nonr_plot} Stage of (re)assignment of cases per interviewer",  linebreak, "Note: Current assignment is based on interviewer who made last contact attempt"), fig.scap="Stage of (re)assignment of cases per interviewer", error=T}
+
+# #Distribtion of Assignment Stage #!Removed due to FMS limited information on intnum
+
+# Assignstage <- select(IwerQI1, c(lastattempt.intnum, assignmentstage1:assignmentstage3)) %>%
+#   tidyr::gather(Assignment, Value, -lastattempt.intnum)
+# 
+# ggplot(Assignstage,
+#        aes(y = as.factor(lastattempt.intnum), x = Value, fill = Assignment)) +
+#   geom_col(position = "stack")  +
+#   labs(x = "Cases",
+#        y = "Interviewers")
+
+```
+
+
+## Interviews and response rate per interviewer {#sec:rriwers}
+
+The number of completed interviews provides an absolute indicator of the performance of interviewers, while the response rate provides a performance indicator relative to the other outcomes and the number of cases assigned to the interviewer. Extremely high or extremely low response rates can be indicators of deviation from the standards of the ESS or weakness in the training for contacting and gaining the cooperation of respondents. Response rates should be evaluated in the national context. 
+
+Figure \ref{fig:iwerint_plot} shows the number of interviews per interviewer. Figure \ref{fig:iwerrr_plot} shows the distribution of response rates per interviewers. Only interviewers with 5 or more cases that have valid outcome codes are included in the analysis. The mean response rate across the interviewer and ± 2 standard deviations are highlighted in the figure to help provide a relative reference across interviewers.  
+
+Detailed investigation of the characteristics of the cases assigned to interviewers that noticeably high or low response rates are necessary as they can differ significantly depending on the assignment (e.g. the number of cases, outcomes, regional and PSU characteristics, respondent characteristics).
+
+
+```{r iwerrr, results = "asis", error=T}
+## Response rates per iwer
+#Descriptives#
+IwerQI1_rrdescr <- psych::describe(IwerQI1$rr, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+IwerQI1_intdescr <- psych::describe(IwerQI1$INT, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+kable(IwerQI1_intdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for interviews per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+kable(IwerQI1_rrdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for response rates per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+```
+
+```{r iwerint_plot,  fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:iwerint_plot} Interviews per Interviewer",  linebreak, "Note: based on interviewer who made the last contact attempt. Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Interviews per Interviewer", error=T}
+
+## Cases plot
+a <- ggplot(IwerQI1,
+       aes(INT, as.factor(lastattempt.intnum))) +
+  labs(x = "Number of completed interviews",
+       y = "Interviewers") +
+  geom_vline(xintercept = IwerQI1_intdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI1_intdescr$mean + IwerQI1_intdescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI1_intdescr$mean + IwerQI1_intdescr$sd*-2)
+
+if(((IwerQI1_intdescr$mean + IwerQI1_intdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+```{r iwerrr_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:rriwer_plot} Response rate per interviewer for current assignment",  linebreak, "Note: Interviewers less than 5 cases have been excluded of analysis. Mean and ± 2 standard deviations shown"), fig.scap="Response rate per interviewer for current assignment", error=T}
+
+# RR Plot
+a <- ggplot(IwerQI1[IwerQI1$NGROSS > 4,], #Filter out iwer with 5 or less cases (based on NGROSS > 4 for those havign some outcome only (not contacted at all excluded))
+       aes(rr, as.factor(lastattempt.intnum))) +
+  labs(x = "Response Rate",
+       y = "Interviewers (with min 5 cases)") +
+  geom_vline(xintercept = IwerQI1_rrdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI1_rrdescr$mean + IwerQI1_rrdescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI1_rrdescr$mean + IwerQI1_rrdescr$sd*-2)
+
+if(((IwerQI1_rrdescr$mean + IwerQI1_rrdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+## Refusal rate per interviewer {#sec:refriwers}
+
+The refusal rate of each can also help evaluate the performance of interviewers in the field. Very high refusal rates can be an indication of departure from the ESS standards or problems in the training of interviewers in refusal avoidance. Extremely low refusal rates relative to other interviewers could also indicate issues in correctly recording the outcome of interactions with respondents or poor interviewer behaviour. 
+
+Figure\ref{fig:iwerrefr_plot} shows the refusal rates of each interviewer based on their assigned cases. Only interviewers with 5 or more cases that have valid outcome codes are included in the analysis. The mean refusal rate across interviewers and ± 2 standard deviations are highlighted in the figure to help provide a relative reference across interviewers.
+
+Refusal indicators should be observed in conjunction with cooperation rates which exclude non-contacts and other non-responses from the equation (see section next section).
+
+
+```{r iwerrefr, results = "asis", error=T}
+## Refusal rates per iwer
+#Descriptives
+IwerQI1_refrdescr <- psych::describe(IwerQI1$refr, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+kable(IwerQI1_refrdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for refusal rates per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+```
+
+```{r iwerrefr_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:refriwer_plot} Refusal rate per interviewer for current assignment",  linebreak, "Note: Interviewers less than 5 cases have been excluded from the analysis. Mean and ± 2 standard deviations shown"), fig.scap="Refusal rate per interviewer for current assignment", error=T}
+
+#Plot
+a <- ggplot(IwerQI1[IwerQI1$NGROSS > 4,], #Filter out iwer with 5 or less cases (based on NGROSS > 4 for those havign some outcome only (not contacted at all excluded))
+       aes(refr, as.factor(lastattempt.intnum))) +
+  labs(x = "Refusal Rate",
+       y = "Interviewers (with min 5 cases)") +
+  geom_vline(xintercept = IwerQI1_refrdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI1_refrdescr$mean + IwerQI1_refrdescr$sd*2) +
+  geom_point()
+
+b <- a +   geom_vline(xintercept = IwerQI1_refrdescr$mean + IwerQI1_refrdescr$sd*-2)
+
+if(((IwerQI1_refrdescr$mean + IwerQI1_refrdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+
+```
+
+## Cooperation rate per interviewer {#sec:coopriwer}
+
+Figure \ref{fig:iwercoopr_plot} shows the cooperation rate gained by each interviewer. The cooperation rate is calculated by dividing the number of interviews by the sum of the refusal plus the completed interviews. Like the refusal rate, the cooperation rate helps evaluate the performance of interviewers in the field. However, it focuses explicitly on cases that have been contacted, and attempts for cooperation to participate in the survey have been cleared. Please note that for the interviewer breakdown, partial interviews have been excluded.
+
+```{r iwercoopr, results = "asis", error=T}
+## Cooperation rate per iwer
+#Descriptives
+IwerQI1_cooprdescr <- psych::describe(IwerQI1$coopr, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+kable(IwerQI1_cooprdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for cooperation rates per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+```
+
+```{r iwercoopr_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:iwercoopr_plot} Cooperation rate per interviewer for current assignment",  linebreak, "Note: Interviewers less than 5 cases have been excluded from the analysis (interviews + refusals). Mean and ± 2 standard deviations shown"), fig.scap="Cooperation rate per interviewer for current assignment", error=T}
+
+#Plot
+a <- ggplot(IwerQI1[IwerQI1$INTREF > 4,], #Filter out iwer with 5 or less cases (based on INTREF > 4 for those having either a refusal or an interview)
+       aes(coopr, as.factor(lastattempt.intnum))) +
+  labs(x = "Cooperation Rate",
+       y = "Interviewers (with min 5 cases)") +
+  geom_vline(xintercept = IwerQI1_cooprdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI1_cooprdescr$mean + IwerQI1_cooprdescr$sd*2) +
+  geom_point()
+
+b <- a +   geom_vline(xintercept = IwerQI1_cooprdescr$mean + IwerQI1_cooprdescr$sd*-2)
+
+if(((IwerQI1_cooprdescr$mean + IwerQI1_cooprdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+
+```
+
+## Non-contacts per interviewer {#sec:nonciwer}
+
+Figure \ref{fig:iwernc_plot} shows sample units currently coded as non-contact and how they are distributed across interviewer. Depending on the fieldwork stage, this indicator can be useful for detecting “bottle necks” of sample units among few interviewers and evaluating the re-issuing of cases. 
+
+To account for the number of cases assigned to each interviewer, we need to view the rate of non-contacts. Figure \ref{fig:iwerncr_plot} shows the non-contact rate per interviewer. This indicator complements the other rates already presented, but it also helps identify interviewers with the largest potential for interviews if cases are contacted. We should bear in mind the number of personal visits and contact attempts made to non-contacts to account for the effort already carried out by the interviewers (see sections \ref{sec:noncless4}).
+
+
+```{r iwernoncontact, results = "asis", error=T}
+## Non-contact per iwer
+#Descriptives rate
+IwerQI1_ncdescr <- psych::describe(IwerQI1$NC, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+#Descriptives rate
+IwerQI1_ncrdescr <- psych::describe(IwerQI1$ncr, quant=c(.05,.95)) %>%
+  select(mean, median, sd, Q0.05, Q0.95)
+
+kable(IwerQI1_ncdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for non-contacts per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+kable(IwerQI1_ncrdescr,  # !Alert! sumrow is utility function
+      row.names = FALSE, booktabs = T, 
+      caption = paste("\\label{tab:iwerassigned_tab} Descriptive stats for non-contact rates per interviewer"))  %>% 
+  kable_styling(latex_options = c("HOLD_position"))
+
+```
+
+```{r iwernc_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:refriwer_plot} Distribution of non-contacts per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Distribution of non-contacts per interviewer", error=T}
+
+## Cases plot
+a <- ggplot(IwerQI1,
+       aes(NC, as.factor(lastattempt.intnum))) +
+  labs(x = "Number of non-contact",
+       y = "Interviewers") +
+  geom_vline(xintercept = IwerQI1_ncdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI1_ncdescr$mean + IwerQI1_ncdescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI1_ncdescr$mean + IwerQI1_ncdescr$sd*-2)
+
+if(((IwerQI1_ncdescr$mean + IwerQI1_ncdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+
+```{r iwerncr_plot, fig.height = 9, fig.width = 7, fig.cap = paste("\\label{fig:refriwer_plot} Non-contact rate per interviewer for current assignment",  linebreak, "Note: Interviewers less than 5 cases have been excluded from the analysis. Mean and ± 2 standard deviations shown"), fig.scap="Non-contact rate per interviewer for current assignment", error=T}
+
+#Plot
+a <- ggplot(IwerQI1[IwerQI1$NGROSS > 4,], #Filter out iwer with 5 or less cases (based on NGROSS > 4 for those havign some outcome only (not contacted at all excluded))
+       aes(ncr, as.factor(lastattempt.intnum))) +
+  labs(x = "Non-contact rate",
+       y = "Interviewers (with min 5 cases)") +
+  geom_vline(xintercept = IwerQI1_ncrdescr$mean, color = wes_palette(n=1, name = "Zissou1")) +
+  geom_vline(xintercept = IwerQI1_ncrdescr$mean + IwerQI1_ncrdescr$sd*2) +
+  geom_point()
+
+b <- a + geom_vline(xintercept = IwerQI1_ncrdescr$mean + IwerQI1_ncrdescr$sd*-2)
+
+if(((IwerQI1_ncrdescr$mean + IwerQI1_ncrdescr$sd*-2)>0)) #Exclude negative value from standard deviation
+  {print(b)} else {print(a)}
+
+```
+
+## Non-contacts with less than 4 personal visits or contact attempts {#sec:noncless4}
+
+As mentioned in section \ref{sec:nnonc}, ESS Specifications indicate that sample units need to be visited at least fort times in person before they can be abandoned as ‘non‐productive’. Identifying interviewers with a large number of non‐contacts without at least 4 personal visits or contact attempts helps detect issues in the workforce, keep oversight on their work and activeness, and allow for reissuing of sample units to other interviewers if necessary. Especially at later stages of the fieldwork, it is essential to evaluate non-contacts carefully to avoid leaving sample units with less effort than the minimum required by the ESS standards. 
+
+Figure \ref{fig:iwerncless4pv_plot} shows the number of non‐contacts with less than 4 personal visits assigned to each interviewer. 
+Figure \ref{fig:iwerncless4ca_plot} widens the focus of the analysis to any type of contact attempt, showing the number of non‐contacts with less than 4 contact attempts per interviewer. 
+
+```{r iwerncless4pv_plot, fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerncless4pv_plot} Distribution of non-contacts with less than 4 personal visits per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Distribution of non-contacts with less than 4 personal visits per interviewer", error=T}
+
+## Cases plot
+a <- ggplot(IwerNCless4pv,
+       aes(ncless4pv, as.factor(lastattempt.intnum))) +
+  labs(x = "Number of non-contacts with less than 4 personal visits",
+       y = "Interviewers (not shown if x equal 0)") +
+  scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4pv)+1))) +
+  geom_point(color='orangered3')
+
+b <- ggplot(IwerQI1,
+       aes(ncless4pv, as.factor(lastattempt.intnum))) +
+  labs(x = "Number of non-contacts with less than 4 personal visits",
+       y = "Interviewers") +
+  scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4pv)+1))) +
+  geom_point(color='green4')
+
+## Show only if higher than 0
+##if(nrow(CF_ncless4ca)>0) {print(a)} 
+ifelse(nrow(CF_ncless4pv)>0, print(a), print(b))
+
+```
+
+
+```{r iwerncless4ca_plot, fig.height = 8, fig.width = 7, fig.cap = paste("\\label{fig:iwerncless4ca_plot} Distribution of non-contacts with less than 4 contact attemtps per interviewer",  linebreak, "Note: Mean and ± 2 standard deviations shown (unless negative value)"), fig.scap="Distribution of non-contacts with less than 4 contact attemtps per interviewer", error=T}
+
+## Cases plot
+a <- ggplot(IwerNCless4ca,
+       aes(ncless4ca, as.factor(lastattempt.intnum))) +
+  labs(x = "Number of non-contacts with less than 4 contact attempts",
+       y = "Interviewers (not shown if x equal 0)") +
+  scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4ca)+1))) +
+  geom_point(color='orangered3')
+
+b <- ggplot(IwerQI1,
+       aes(ncless4ca, as.factor(lastattempt.intnum))) +
+  labs(x = "Number of non-contacts with less than 4 contact attempts",
+       y = "Interviewers") +
+  scale_x_continuous(limits = c(0,(max(IwerQI1$ncless4ca)+1))) +
+  geom_point(color='green4')
+
+## Show only if higher than 0
+##if(nrow(CF_ncless4ca)>0) {print(a)} 
+ifelse(nrow(CF_ncless4ca)>0, print(a), print(b))
+
+```
+
+
+```{r writecsv, error=T}
+
+
+#Version for csv in name
+FMSinfo <- "_FMSapp"
+
+## CF with main indicators
+
+# write.table(CF_main, 
+#             file=paste("Annex/", thisCountry, FMSinfo, " CF main indicators.csv",  sep=""), 
+#             sep = ";", row.names = F)
+## R9
+write.table(CF_main, 
+            file=paste("Annex/", thisCountry, FMSinfo, " CF main indicators.csv",  sep=""), 
+            sep = ";", row.names = F)
+
+
+## Main outcome indicators
+# write.table(CF_outcome_breakdown[,c("code", "Country", "Freq", "classification", "type", "label", "aggregated", "NTS")], 
+#             file=paste("Annex/", thisCountry, FMSinfo, " breakdown outcome indicators.csv",  sep=""), 
+#             sep = ";", row.names = F)
+## R9
+write.table(CF_outcome_breakdown[,c("code", "Country", "Freq", "classification", "type", "label", "aggregated", "NTS")], 
+            file=paste("Annex/", thisCountry, FMSinfo, " breakdown outcome indicators.csv",  sep=""), 
+            sep = ";", row.names = F)
+
+
+#Iwer Indicator 1 based on current cases
+write.table(IwerQI1, 
+            file=paste("Annex/", thisCountry, FMSinfo, " all interviewer indicators for current cases.csv",  sep=""), 
+            sep = ";", row.names = F)
+
+#Iwer Indicator 2 based on contact attempts
+write.table(IwerQI2, 
+            file=paste("Annex/", thisCountry, FMSinfo, " all interviewer indicators for contact attempts.csv",  sep=""), 
+            sep = ";", row.names = F)
+
+```
+
+# References

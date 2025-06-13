@@ -1,0 +1,188 @@
+---
+output:
+  pdf_document:
+    includes:
+      in_header: styles.tex
+    number_sections: TRUE
+    latex_engine: xelatex
+    fig_caption: yes
+    fig_width: 4
+    fig_height: 3
+    keep_tex: TRUE
+header-includes:
+  - \usepackage{titling}
+  - \setlength{\droptitle}{5em} 
+papersize: a4paper
+fontsize: 11pt
+mainfont: Calibri
+geometry: margin = 3cm
+subparagraph: TRUE
+graphics: yes
+bibliography: References.bib
+csl: apa.csl
+link-citations: yes
+params:
+  mainFile: "DEMO DATA R9/ESS10 DATA_MAIN_QUESTIONNAIRE_TIMESTAMPS.sav"
+  intFile: "DEMO DATA R9/ESS10 DATA_INTERVIEWER QUESTIONNAIRE.sav"
+
+# European Social Survey - European Research Infrastructure (ESS-ERIC)
+# europeansocialsurvey.org
+# Notes
+# Version: 6.2 data structure inspection
+# Data format: SPSS
+---
+
+```{r setup, include = FALSE, error=T}
+library(knitr)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo = TRUE, results = "show", message = FALSE, dev = "cairo_pdf", warning = TRUE)
+knitr::opts_chunk$set(fig.pos = 'H')
+
+options(knitr.table.format = "latex", knitr.kable.NA = "")
+
+Sys.setlocale("LC_ALL","English")
+```
+
+```{r setup2, include = FALSE, error=T}
+#Installed packages
+library(here) 
+library(foreign)
+library(dplyr)
+library(psych)
+library(ggplot2)
+library(lubridate)
+library(wesanderson)
+library(haven)
+library(colortools) # adjacent works
+library(ggthemes) # theme_tufte works
+library(varhandle) # coercing factor to numeric variables
+library(naniar) # for replacing values with missings
+library(knitr)
+library(kableExtra)
+library("Gifi") #Implements categorical principal component analysis
+library(matrixStats) #High-performing functions operating on rows and columns of matrices
+library(cowplot)
+library(tibble)
+
+#Utilities
+source("Utility functions.R")
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+```{r theme, include = FALSE, error=T}
+ESSred <- rgb(.91, .20, .32)
+ESSgreen <- rgb(.14, .62, .51)
+ESSblue <- rgb(0, .25, .48)
+  
+ESSColors <- unique(c(adjacent(ESSred, plot = F), square(ESSred, plot = F)))
+
+ESSColors <- c(ESSColors, ESSgreen, ESSblue)
+# pizza(ESSColors)
+
+themeESS <- theme_tufte(base_size = 9, base_family = "Calibri") +
+    theme(axis.title = element_text(size = 9, face = "plain"),
+          axis.text = element_text(size = 9),
+          axis.line.x = element_line(),
+          plot.title = element_blank(),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 9),
+          strip.text = element_text(size = 9, face = "bold"),
+          legend.position = "none",
+          legend.direction = "horizontal",
+          legend.box = "vertical",
+          legend.spacing = unit(0, "line"),
+          legend.key.size = unit(.75, "line"))
+linebreak <- "\\hspace{\\textwidth}"
+```
+
+\newpage
+\FloatBarrier
+\pagenumbering{gobble}
+
+\pagenumbering{arabic}
+
+\setcounter{tocdepth}{2}
+
+# Inspection Data Structure {-}
+
+```{r getdata, error=T}
+# Interviewer-Questionnaire with Inwer ID (intnum):
+Inwer <- foreign::read.spss(params$intFile,
+                 use.value.labels = F,
+                 use.missings = F,
+                 to.data.frame = T)
+# Main Dataset
+Main <- foreign::read.spss(params$mainFile,
+                 use.value.labels = F,
+                 use.missings = F,
+                 to.data.frame = T)
+
+# Inwer<-haven::read_spss(params$intFile)
+# Main<-haven::read_spss(params$mainFile)
+
+#Variable names to lower cases
+names(Inwer) <- tolower(names(Inwer))
+names(Main) <- tolower(names(Main))
+Inwer_ID <- dplyr::select(Inwer, "intnum", "idno")
+Main <- dplyr::left_join(Main, Inwer_ID, by = "idno")
+```
+
+```{r countrynames_rounds, error=T}
+# this Country
+Countrynames <- (read.csv2("Country names and codes.csv", dec = ".", stringsAsFactors = F))
+Country <- as.data.frame(Main$cntry)
+Country <- dplyr::rename(Country, cntry = 'Main$cntry')
+Country <- left_join(Country, Countrynames, by = "cntry")
+thisCountry <- unique(Country$CountryName)
+```
+
+```{r missingintnum, error=T}
+# Allcases in Main
+Mainfull <- Main
+# Filter out cases without intnum
+Main <- Main %>% filter(!is.na(intnum))
+```
+
+This report presents the results of inspection of the data structure of interim dataset in `r thisCountry`. It is aimed to solve issues in the implementation of the tool. If you are having problems with the implemenation of the tool, please share this report with your Country Contact or the ESS Team for Desirable Interviewer Behaviour via my ESS.
+The data provided contained a total of `r length(Mainfull$idno)` cases. A total of `r length(Main$idno)` cases had a valid interviewer number.
+
+
+# Data Structure and Variable Characteristic {#sec:datastructure}
+
+```{r data check, error=T}
+
+#Var check
+print(names(Mainfull)) #selected maim dataset prior merge
+print(names(Inwer)) #selected iwer dataset prior merge
+names(Country)
+
+#Variable class
+sapply(Main, class) #merged dataset
+
+#NAs in key variables?
+table(is.na(Main$cntry))
+table(is.na(Main$idno))
+table(is.na(Main$intnum))
+
+#Unique idno
+length(unique(Main$idno))
+
+#Print cntry
+table(Main$cntry)
+table(Inwer$cntry)
+table(Country$cntry)
+
+#Cases per iwer
+Main %>% group_by(intnum) %>%
+  summarise(nperm = n())
+
+#Data structure 
+psych::describe(Main) #n, mean, sd, median, min, max, range, etc. 
+sapply(Main, mean, na.rm=FALSE)
+
+#Query locales
+Sys.setlocale()
+Sys.Date()
+
+```
